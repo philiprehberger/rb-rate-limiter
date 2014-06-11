@@ -15,7 +15,7 @@ module Philiprehberger
       end
 
       def peek(key)
-        @mutex.synchronize { count_remaining(key) > 0 }
+        @mutex.synchronize { count_remaining(key).positive? }
       end
 
       def remaining(key)
