@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-12
+
+### Added
+- Read-only accessors: `limit`, `window` on SlidingWindow; `rate`, `capacity` on TokenBucket
+- `info(key)` method on both strategies returning remaining quota, limits, and usage stats
+- Single-process usage note in README
+- SlidingWindow vs TokenBucket comparison table in README
+
 ## [0.1.0] - 2026-03-10
 
 ### Added

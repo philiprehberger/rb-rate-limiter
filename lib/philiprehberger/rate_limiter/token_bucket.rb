@@ -3,6 +3,8 @@
 module Philiprehberger
   module RateLimiter
     class TokenBucket
+      attr_reader :rate, :capacity
+
       def initialize(rate:, capacity:)
         @rate = rate.to_f
         @capacity = capacity.to_f
@@ -24,6 +26,24 @@ module Philiprehberger
 
       def reset(key)
         @mutex.synchronize { @store.delete(key.to_s) }
+      end
+
+      # Return usage info for a key.
+      #
+      # @param key [String, Symbol] the rate limit key
+      # @return [Hash] remaining tokens, capacity, and rate
+      def info(key)
+        @mutex.synchronize do
+          refill(key)
+          bucket = fetch_bucket(key)
+          tokens = [bucket[:tokens], @capacity].min
+          {
+            remaining: tokens.to_i,
+            capacity: @capacity.to_i,
+            rate: @rate,
+            tokens: tokens
+          }
+        end
       end
 
       private

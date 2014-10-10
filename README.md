@@ -5,6 +5,8 @@
 
 In-memory rate limiter with sliding window and token bucket algorithms, per-key tracking, and thread safety.
 
+> **Note:** This is a single-process, in-memory rate limiter. It does not share state across processes or servers. For distributed rate limiting, use a centralized store like Redis.
+
 ## Requirements
 
 - Ruby >= 3.1
@@ -70,11 +72,28 @@ limiter.peek("user:123")      # => true/false (does not consume)
 limiter.remaining("user:123") # => number of remaining requests/tokens
 ```
 
+### Inspecting Usage
+
+```ruby
+info = limiter.info("user:123")
+# => { remaining: 98, limit: 100, window: 60, used: 2 }  (sliding window)
+# => { remaining: 48, capacity: 50, rate: 10.0, tokens: 48.3 }  (token bucket)
+```
+
 ### Resetting a Key
 
 ```ruby
 limiter.reset("user:123")
 ```
+
+### Sliding Window vs Token Bucket
+
+| Feature | SlidingWindow | TokenBucket |
+|---------|---------------|-------------|
+| Best for | Fixed request counts per window | Allowing bursts with steady refill |
+| Parameters | `limit`, `window` (seconds) | `rate` (tokens/sec), `capacity` |
+| Burst behavior | No bursting beyond limit | Allows bursts up to capacity |
+| Memory | Stores timestamps per request | Stores one float + timestamp per key |
 
 ## API
 
@@ -86,6 +105,11 @@ limiter.reset("user:123")
 | `#peek(key)` | Check availability without consuming |
 | `#remaining(key)` | Return remaining request/token count |
 | `#reset(key)` | Clear all state for a key |
+| `#info(key)` | Return usage info hash (remaining, limit/capacity, used/tokens) |
+| `SlidingWindow#limit` | Return the configured request limit |
+| `SlidingWindow#window` | Return the configured window duration (seconds) |
+| `TokenBucket#rate` | Return the configured refill rate (tokens/sec) |
+| `TokenBucket#capacity` | Return the configured token capacity |
 
 ## Development
 

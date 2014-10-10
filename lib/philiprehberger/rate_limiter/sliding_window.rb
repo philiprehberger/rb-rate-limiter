@@ -3,6 +3,8 @@
 module Philiprehberger
   module RateLimiter
     class SlidingWindow
+      attr_reader :limit, :window
+
       def initialize(limit:, window:)
         @limit = limit
         @window = window
@@ -24,6 +26,23 @@ module Philiprehberger
 
       def reset(key)
         @mutex.synchronize { @store.delete(key.to_s) }
+      end
+
+      # Return usage info for a key.
+      #
+      # @param key [String, Symbol] the rate limit key
+      # @return [Hash] remaining, limit, window, and used counts
+      def info(key)
+        @mutex.synchronize do
+          cleanup(key)
+          entries = fetch_entries(key)
+          {
+            remaining: [@limit - entries.length, 0].max,
+            limit: @limit,
+            window: @window,
+            used: entries.length
+          }
+        end
       end
 
       private
