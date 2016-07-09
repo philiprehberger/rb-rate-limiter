@@ -73,12 +73,66 @@ limiter.peek("user:123")      # => true/false (does not consume)
 limiter.remaining("user:123") # => number of remaining requests/tokens
 ```
 
+### Weighted Requests
+
+Consume multiple tokens per request for expensive operations:
+
+```ruby
+limiter.allow?("user:123", weight: 5) # consumes 5 tokens
+limiter.allow?("user:123", weight: 1) # consumes 1 token (default)
+```
+
 ### Inspecting Usage
 
 ```ruby
 info = limiter.info("user:123")
-# => { remaining: 98, limit: 100, window: 60, used: 2 }  (sliding window)
-# => { remaining: 48, capacity: 50, rate: 10.0, tokens: 48.3 }  (token bucket)
+# Sliding window:
+# => { remaining: 98, reset_at: 1710000060.5, limit: 100, window: 60, used: 2 }
+# Token bucket:
+# => { remaining: 48, reset_at: 1710000000.2, capacity: 50, rate: 10.0, tokens: 48.3 }
+```
+
+The `reset_at` value is a monotonic timestamp suitable for computing X-RateLimit-Reset headers. It is `nil` when the key has no usage or is at full capacity.
+
+### Per-Key Stats
+
+Track allowed and rejected request counts:
+
+```ruby
+limiter.stats("user:123")
+# => { allowed: 42, rejected: 3 }
+```
+
+### Quota Refund
+
+Return tokens when a downstream operation fails (so the failed request does not count):
+
+```ruby
+if limiter.allow?("user:123")
+  begin
+    make_api_call
+  rescue ApiError
+    limiter.refund("user:123", amount: 1)
+  end
+end
+```
+
+### On-Reject Callback
+
+Register a hook for logging or alerting when requests are rejected:
+
+```ruby
+limiter.on_reject do |key|
+  logger.warn("Rate limit exceeded for #{key}")
+end
+```
+
+The method returns `self` for chaining:
+
+```ruby
+limiter = Philiprehberger::RateLimiter
+  .sliding_window(limit: 100, window: 60)
+  .on_reject { |key| logger.warn("Rejected: #{key}") }
 ```
 
 ### Resetting a Key
@@ -102,11 +156,14 @@ limiter.reset("user:123")
 |--------|-------------|
 | `RateLimiter.sliding_window(limit:, window:)` | Create a sliding window limiter |
 | `RateLimiter.token_bucket(rate:, capacity:)` | Create a token bucket limiter |
-| `#allow?(key)` | Check and consume one request/token; returns `true`/`false` |
+| `#allow?(key, weight: 1)` | Check and consume token(s); returns `true`/`false` |
 | `#peek(key)` | Check availability without consuming |
 | `#remaining(key)` | Return remaining request/token count |
 | `#reset(key)` | Clear all state for a key |
-| `#info(key)` | Return usage info hash (remaining, limit/capacity, used/tokens) |
+| `#info(key)` | Return usage info hash (remaining, reset_at, limit/capacity, used/tokens) |
+| `#stats(key)` | Return `{ allowed:, rejected: }` counters for a key |
+| `#refund(key, amount: 1)` | Return tokens/slots on error |
+| `#on_reject { \|key\| }` | Register a callback for rejected requests |
 | `SlidingWindow#limit` | Return the configured request limit |
 | `SlidingWindow#window` | Return the configured window duration (seconds) |
 | `TokenBucket#rate` | Return the configured refill rate (tokens/sec) |

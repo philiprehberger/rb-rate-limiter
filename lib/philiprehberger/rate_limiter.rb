@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "rate_limiter/version"
+require_relative "rate_limiter/stats_tracking"
 require_relative "rate_limiter/sliding_window"
 require_relative "rate_limiter/token_bucket"
 

@@ -47,6 +47,32 @@ RSpec.describe Philiprehberger::RateLimiter::SlidingWindow do
     end
   end
 
+  describe "#allow? with weight" do
+    it "consumes multiple tokens with weight" do
+      expect(limiter.allow?("user1", weight: 2)).to be true
+      expect(limiter.remaining("user1")).to eq(1)
+    end
+
+    it "rejects when weight exceeds remaining" do
+      limiter.allow?("user1", weight: 2)
+      expect(limiter.allow?("user1", weight: 2)).to be false
+    end
+
+    it "allows exact remaining weight" do
+      limiter.allow?("user1", weight: 2)
+      expect(limiter.allow?("user1", weight: 1)).to be true
+    end
+
+    it "rejects when weight exceeds total limit" do
+      expect(limiter.allow?("user1", weight: 4)).to be false
+    end
+
+    it "defaults weight to 1" do
+      limiter.allow?("user1")
+      expect(limiter.remaining("user1")).to eq(2)
+    end
+  end
+
   describe "#peek" do
     it "returns true when requests are available" do
       expect(limiter.peek("user1")).to be true
@@ -109,6 +135,108 @@ RSpec.describe Philiprehberger::RateLimiter::SlidingWindow do
       expect(info[:remaining]).to eq(3)
       expect(info[:used]).to eq(0)
     end
+
+    it "includes reset_at timestamp when entries exist" do
+      limiter.allow?("user1")
+      info = limiter.info("user1")
+      expect(info[:reset_at]).to be_a(Float)
+    end
+
+    it "returns nil reset_at for unused key" do
+      info = limiter.info("new_key")
+      expect(info[:reset_at]).to be_nil
+    end
+  end
+
+  describe "#stats" do
+    it "returns zeroes for an unused key" do
+      stats = limiter.stats("user1")
+      expect(stats).to eq({ allowed: 0, rejected: 0 })
+    end
+
+    it "counts allowed requests" do
+      2.times { limiter.allow?("user1") }
+      stats = limiter.stats("user1")
+      expect(stats[:allowed]).to eq(2)
+    end
+
+    it "counts rejected requests" do
+      3.times { limiter.allow?("user1") }
+      2.times { limiter.allow?("user1") }
+      stats = limiter.stats("user1")
+      expect(stats[:rejected]).to eq(2)
+    end
+
+    it "tracks keys independently" do
+      3.times { limiter.allow?("user1") }
+      limiter.allow?("user1")
+      limiter.allow?("user2")
+      expect(limiter.stats("user1")[:rejected]).to eq(1)
+      expect(limiter.stats("user2")[:allowed]).to eq(1)
+    end
+
+    it "returns a copy so external mutation is safe" do
+      limiter.allow?("user1")
+      stats = limiter.stats("user1")
+      stats[:allowed] = 999
+      expect(limiter.stats("user1")[:allowed]).to eq(1)
+    end
+  end
+
+  describe "#refund" do
+    it "restores capacity after a refund" do
+      3.times { limiter.allow?("user1") }
+      expect(limiter.remaining("user1")).to eq(0)
+      limiter.refund("user1", amount: 1)
+      expect(limiter.remaining("user1")).to eq(1)
+    end
+
+    it "does not refund more than consumed" do
+      limiter.allow?("user1")
+      limiter.refund("user1", amount: 5)
+      expect(limiter.remaining("user1")).to eq(3)
+    end
+
+    it "defaults amount to 1" do
+      2.times { limiter.allow?("user1") }
+      limiter.refund("user1")
+      expect(limiter.remaining("user1")).to eq(2)
+    end
+
+    it "returns nil" do
+      limiter.allow?("user1")
+      expect(limiter.refund("user1")).to be_nil
+    end
+  end
+
+  describe "#on_reject" do
+    it "fires callback when a request is rejected" do
+      rejected_keys = []
+      limiter.on_reject { |key| rejected_keys << key }
+      3.times { limiter.allow?("user1") }
+      limiter.allow?("user1")
+      expect(rejected_keys).to eq(["user1"])
+    end
+
+    it "does not fire on allowed requests" do
+      called = false
+      limiter.on_reject { |_key| called = true }
+      limiter.allow?("user1")
+      expect(called).to be false
+    end
+
+    it "fires for each rejection" do
+      count = 0
+      limiter.on_reject { |_key| count += 1 }
+      3.times { limiter.allow?("user1") }
+      3.times { limiter.allow?("user1") }
+      expect(count).to eq(3)
+    end
+
+    it "returns self for chaining" do
+      result = limiter.on_reject { |_key| nil }
+      expect(result).to be(limiter)
+    end
   end
 
   describe "thread safety" do
@@ -145,6 +273,32 @@ RSpec.describe Philiprehberger::RateLimiter::TokenBucket do
       3.times { limiter.allow?("user1") }
       sleep(0.2)
       expect(limiter.allow?("user1")).to be true
+    end
+  end
+
+  describe "#allow? with weight" do
+    it "consumes multiple tokens with weight" do
+      expect(limiter.allow?("user1", weight: 2)).to be true
+      expect(limiter.remaining("user1")).to eq(1)
+    end
+
+    it "rejects when weight exceeds remaining tokens" do
+      limiter.allow?("user1", weight: 2)
+      expect(limiter.allow?("user1", weight: 2)).to be false
+    end
+
+    it "allows exact remaining weight" do
+      limiter.allow?("user1", weight: 2)
+      expect(limiter.allow?("user1", weight: 1)).to be true
+    end
+
+    it "rejects when weight exceeds total capacity" do
+      expect(limiter.allow?("user1", weight: 4)).to be false
+    end
+
+    it "defaults weight to 1" do
+      limiter.allow?("user1")
+      expect(limiter.remaining("user1")).to eq(2)
     end
   end
 
@@ -209,6 +363,108 @@ RSpec.describe Philiprehberger::RateLimiter::TokenBucket do
       info = limiter.info("new_key")
       expect(info[:remaining]).to eq(3)
       expect(info[:capacity]).to eq(3)
+    end
+
+    it "includes reset_at when tokens are depleted" do
+      3.times { limiter.allow?("user1") }
+      info = limiter.info("user1")
+      expect(info[:reset_at]).to be_a(Float)
+    end
+
+    it "returns nil reset_at when at full capacity" do
+      info = limiter.info("new_key")
+      expect(info[:reset_at]).to be_nil
+    end
+  end
+
+  describe "#stats" do
+    it "returns zeroes for an unused key" do
+      stats = limiter.stats("user1")
+      expect(stats).to eq({ allowed: 0, rejected: 0 })
+    end
+
+    it "counts allowed requests" do
+      2.times { limiter.allow?("user1") }
+      stats = limiter.stats("user1")
+      expect(stats[:allowed]).to eq(2)
+    end
+
+    it "counts rejected requests" do
+      3.times { limiter.allow?("user1") }
+      2.times { limiter.allow?("user1") }
+      stats = limiter.stats("user1")
+      expect(stats[:rejected]).to eq(2)
+    end
+
+    it "tracks keys independently" do
+      3.times { limiter.allow?("user1") }
+      limiter.allow?("user1")
+      limiter.allow?("user2")
+      expect(limiter.stats("user1")[:rejected]).to eq(1)
+      expect(limiter.stats("user2")[:allowed]).to eq(1)
+    end
+
+    it "returns a copy so external mutation is safe" do
+      limiter.allow?("user1")
+      stats = limiter.stats("user1")
+      stats[:allowed] = 999
+      expect(limiter.stats("user1")[:allowed]).to eq(1)
+    end
+  end
+
+  describe "#refund" do
+    it "restores tokens after a refund" do
+      3.times { limiter.allow?("user1") }
+      expect(limiter.remaining("user1")).to eq(0)
+      limiter.refund("user1", amount: 1)
+      expect(limiter.remaining("user1")).to eq(1)
+    end
+
+    it "does not refund beyond capacity" do
+      limiter.allow?("user1")
+      limiter.refund("user1", amount: 5)
+      expect(limiter.remaining("user1")).to eq(3)
+    end
+
+    it "defaults amount to 1" do
+      2.times { limiter.allow?("user1") }
+      limiter.refund("user1")
+      expect(limiter.remaining("user1")).to eq(2)
+    end
+
+    it "returns nil" do
+      limiter.allow?("user1")
+      expect(limiter.refund("user1")).to be_nil
+    end
+  end
+
+  describe "#on_reject" do
+    it "fires callback when a request is rejected" do
+      rejected_keys = []
+      limiter.on_reject { |key| rejected_keys << key }
+      3.times { limiter.allow?("user1") }
+      limiter.allow?("user1")
+      expect(rejected_keys).to eq(["user1"])
+    end
+
+    it "does not fire on allowed requests" do
+      called = false
+      limiter.on_reject { |_key| called = true }
+      limiter.allow?("user1")
+      expect(called).to be false
+    end
+
+    it "fires for each rejection" do
+      count = 0
+      limiter.on_reject { |_key| count += 1 }
+      3.times { limiter.allow?("user1") }
+      3.times { limiter.allow?("user1") }
+      expect(count).to eq(3)
+    end
+
+    it "returns self for chaining" do
+      result = limiter.on_reject { |_key| nil }
+      expect(result).to be(limiter)
     end
   end
 

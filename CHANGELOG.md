@@ -1,14 +1,24 @@
 # Changelog
 
-## 0.2.2
-
-- Add License badge to README
-- Add bug_tracker_uri to gemspec
-
 All notable changes to this gem will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.3.0] - 2026-03-17
+
+### Added
+- Weighted requests: `allow?(key, weight: n)` to consume multiple tokens per request
+- Per-key stats: `stats(key)` returns `{ allowed:, rejected: }` counters
+- Quota refund: `refund(key, amount: 1)` to return tokens on failed operations
+- On-reject callback: `on_reject { |key| ... }` hook for logging/alerting
+- `reset_at` field in `info(key)` response for X-RateLimit-Reset headers
+- `StatsTracking` module for shared stats and callback logic
+
+## [0.2.2]
+
+- Add License badge to README
+- Add bug_tracker_uri to gemspec
 
 ## [Unreleased]
 
