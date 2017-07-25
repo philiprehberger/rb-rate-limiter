@@ -1,13 +1,16 @@
 # Changelog
 
-## 0.3.1
-
-- Fix RuboCop Style/StringLiterals violations in gemspec
-
 All notable changes to this gem will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [0.3.1] - 2026-03-18
+
+### Fixed
+- Fix RuboCop Style/StringLiterals violations in gemspec
 
 ## [0.3.0] - 2026-03-17
 
@@ -19,12 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `reset_at` field in `info(key)` response for X-RateLimit-Reset headers
 - `StatsTracking` module for shared stats and callback logic
 
-## [0.2.2]
+## [0.2.2] - 2026-03-16
 
+### Changed
 - Add License badge to README
 - Add bug_tracker_uri to gemspec
-
-## [Unreleased]
 
 ## [0.2.1] - 2026-03-12
 
