@@ -20,12 +20,6 @@ Add to your Gemfile:
 gem "philiprehberger-rate_limiter"
 ```
 
-Then run:
-
-```bash
-bundle install
-```
-
 Or install directly:
 
 ```bash
