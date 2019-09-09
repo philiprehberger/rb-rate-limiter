@@ -3,6 +3,7 @@
 [![Tests](https://github.com/philiprehberger/rb-rate-limiter/actions/workflows/ci.yml/badge.svg)](https://github.com/philiprehberger/rb-rate-limiter/actions/workflows/ci.yml)
 [![Gem Version](https://badge.fury.io/rb/philiprehberger-rate_limiter.svg)](https://rubygems.org/gems/philiprehberger-rate_limiter)
 [![License](https://img.shields.io/github/license/philiprehberger/rb-rate-limiter)](LICENSE)
+[![Sponsor](https://img.shields.io/badge/sponsor-GitHub%20Sponsors-ec6cb9)](https://github.com/sponsors/philiprehberger)
 
 In-memory rate limiter with sliding window and token bucket
 
@@ -173,4 +174,4 @@ bundle exec rubocop
 
 ## License
 
-MIT
+[MIT](LICENSE)
