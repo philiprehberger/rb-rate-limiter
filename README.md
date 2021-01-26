@@ -2,8 +2,7 @@
 
 [![Tests](https://github.com/philiprehberger/rb-rate-limiter/actions/workflows/ci.yml/badge.svg)](https://github.com/philiprehberger/rb-rate-limiter/actions/workflows/ci.yml)
 [![Gem Version](https://badge.fury.io/rb/philiprehberger-rate_limiter.svg)](https://rubygems.org/gems/philiprehberger-rate_limiter)
-[![License](https://img.shields.io/github/license/philiprehberger/rb-rate-limiter)](LICENSE)
-[![Sponsor](https://img.shields.io/badge/sponsor-GitHub%20Sponsors-ec6cb9)](https://github.com/sponsors/philiprehberger)
+[![Last updated](https://img.shields.io/github/last-commit/philiprehberger/rb-rate-limiter)](https://github.com/philiprehberger/rb-rate-limiter/commits/main)
 
 In-memory rate limiter with sliding window and token bucket
 
@@ -171,6 +170,24 @@ bundle install
 bundle exec rspec
 bundle exec rubocop
 ```
+
+## Support
+
+If you find this project useful:
+
+⭐ [Star the repo](https://github.com/philiprehberger/rb-rate-limiter)
+
+🐛 [Report issues](https://github.com/philiprehberger/rb-rate-limiter/issues?q=is%3Aissue+is%3Aopen+label%3Abug)
+
+💡 [Suggest features](https://github.com/philiprehberger/rb-rate-limiter/issues?q=is%3Aissue+is%3Aopen+label%3Aenhancement)
+
+❤️ [Sponsor development](https://github.com/sponsors/philiprehberger)
+
+🌐 [All Open Source Projects](https://philiprehberger.com/open-source-packages)
+
+💻 [GitHub Profile](https://github.com/philiprehberger)
+
+🔗 [LinkedIn Profile](https://www.linkedin.com/in/philiprehberger)
 
 ## License
 
