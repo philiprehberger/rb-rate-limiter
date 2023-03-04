@@ -41,6 +41,22 @@ module Philiprehberger
         @mutex.synchronize { refund_tokens(key, amount.to_f) }
       end
 
+      # Seconds until the next request would be allowed
+      #
+      # @param key [Symbol, String] the rate limit key
+      # @param weight [Integer] tokens needed
+      # @return [Float] seconds to wait (0 if allowed now)
+      def wait_time(key = :default, weight: 1)
+        @mutex.synchronize do
+          refill(key)
+          tokens = @store[key.to_s] ? @store[key.to_s][:tokens] : @capacity
+          return 0.0 if tokens >= weight
+
+          needed = weight - tokens
+          needed / @rate
+        end
+      end
+
       private
 
       def try_acquire(key, weight)

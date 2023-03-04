@@ -479,3 +479,54 @@ RSpec.describe Philiprehberger::RateLimiter::TokenBucket do
     end
   end
 end
+
+RSpec.describe Philiprehberger::RateLimiter do
+  describe 'SlidingWindow#wait_time' do
+    it 'returns 0 when requests are allowed' do
+      limiter = described_class.sliding_window(limit: 10, window: 60)
+      expect(limiter.wait_time).to eq(0.0)
+    end
+
+    it 'returns positive value when limit is reached' do
+      limiter = described_class.sliding_window(limit: 2, window: 60)
+      limiter.allow?(:default)
+      limiter.allow?(:default)
+      expect(limiter.wait_time).to be > 0
+    end
+  end
+
+  describe 'SlidingWindow#window_reset_at' do
+    it 'returns nil when no requests made' do
+      limiter = described_class.sliding_window(limit: 10, window: 60)
+      expect(limiter.window_reset_at).to be_nil
+    end
+
+    it 'returns a Time after requests' do
+      limiter = described_class.sliding_window(limit: 10, window: 60)
+      limiter.allow?(:default)
+      result = limiter.window_reset_at
+      expect(result).to be_a(Time)
+      expect(result).to be > Time.now
+    end
+  end
+
+  describe 'TokenBucket#wait_time' do
+    it 'returns 0 when tokens are available' do
+      limiter = described_class.token_bucket(rate: 10, capacity: 10)
+      expect(limiter.wait_time).to eq(0.0)
+    end
+
+    it 'returns positive value when bucket is empty' do
+      limiter = described_class.token_bucket(rate: 1, capacity: 1)
+      limiter.allow?(:default)
+      expect(limiter.wait_time).to be > 0
+    end
+
+    it 'respects weight parameter' do
+      limiter = described_class.token_bucket(rate: 1, capacity: 2)
+      limiter.allow?(:default)
+      wait = limiter.wait_time(weight: 5)
+      expect(wait).to be > 0
+    end
+  end
+end

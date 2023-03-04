@@ -41,6 +41,43 @@ module Philiprehberger
         @mutex.synchronize { refund_entries(key, amount) }
       end
 
+      # Seconds until the next request would be allowed
+      #
+      # @param key [Symbol, String] the rate limit key
+      # @return [Float] seconds to wait (0 if allowed now)
+      def wait_time(key = :default)
+        @mutex.synchronize do
+          cleanup(key)
+          entries = fetch_entries(key)
+          return 0.0 if entries.length < @limit
+
+          oldest = entries.min
+          return 0.0 if oldest.nil?
+
+          wait = oldest + @window - now
+          [wait, 0.0].max
+        end
+      end
+
+      # Time when the current window expires
+      #
+      # @param key [Symbol, String] the rate limit key
+      # @return [Time, nil] absolute time when window resets, nil if no requests
+      def window_reset_at(key = :default)
+        @mutex.synchronize do
+          entries = fetch_entries(key)
+          return nil if entries.empty?
+
+          cleanup(key)
+          entries = fetch_entries(key)
+          return nil if entries.empty?
+
+          oldest = entries.min
+          elapsed = now - oldest
+          Time.now + (@window - elapsed)
+        end
+      end
+
       private
 
       def try_acquire(key, weight)
