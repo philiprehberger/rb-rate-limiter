@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-04-07
+
+### Added
+- `#clear` method on `SlidingWindow` and `TokenBucket` to reset state and stats for all keys in one call
+
+### Changed
+- Removed non-standard "Thread Safety" section and single-process blockquote from README to match the standard 10-section template
+
 ## [0.5.1] - 2026-04-05
 
 ### Fixed

@@ -33,6 +33,17 @@ module Philiprehberger
         @mutex.synchronize { @store.delete(key.to_s) }
       end
 
+      # Clear state for all keys (resets quotas and stats for every tracked key)
+      #
+      # @return [void]
+      def clear
+        @mutex.synchronize do
+          @store.clear
+          @stats_store.clear
+        end
+        nil
+      end
+
       def info(key)
         @mutex.synchronize { build_info(key) }
       end
