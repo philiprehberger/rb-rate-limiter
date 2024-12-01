@@ -9,6 +9,17 @@ module Philiprehberger
   module RateLimiter
     class Error < StandardError; end
 
+    # Raised by allow! when the rate limit is exceeded
+    class RateLimitExceeded < Error
+      # @return [String] the key that was rate-limited
+      attr_reader :key
+
+      def initialize(key)
+        @key = key
+        super("Rate limit exceeded for #{key}")
+      end
+    end
+
     def self.sliding_window(limit:, window:)
       SlidingWindow.new(limit: limit, window: window)
     end

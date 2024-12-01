@@ -529,4 +529,104 @@ RSpec.describe Philiprehberger::RateLimiter do
       expect(wait).to be > 0
     end
   end
+
+  describe '#throttle' do
+    it 'executes block and returns allowed hash when under limit (sliding window)' do
+      limiter = described_class.sliding_window(limit: 5, window: 60)
+      result = limiter.throttle(:user) { 'ok' }
+      expect(result).to eq({ allowed: true, value: 'ok' })
+    end
+
+    it 'returns rejected hash when over limit (sliding window)' do
+      limiter = described_class.sliding_window(limit: 1, window: 60)
+      limiter.allow?(:user)
+      result = limiter.throttle(:user) { 'should not run' }
+      expect(result).to eq({ allowed: false, value: nil })
+    end
+
+    it 'executes block and returns allowed hash when under limit (token bucket)' do
+      limiter = described_class.token_bucket(rate: 10, capacity: 5)
+      result = limiter.throttle(:user) { 42 }
+      expect(result).to eq({ allowed: true, value: 42 })
+    end
+
+    it 'returns rejected hash when over limit (token bucket)' do
+      limiter = described_class.token_bucket(rate: 0.001, capacity: 1)
+      limiter.allow?(:user)
+      result = limiter.throttle(:user) { 'nope' }
+      expect(result).to eq({ allowed: false, value: nil })
+    end
+
+    it 'supports weight parameter' do
+      limiter = described_class.sliding_window(limit: 3, window: 60)
+      result = limiter.throttle(:user, weight: 3) { 'heavy' }
+      expect(result).to eq({ allowed: true, value: 'heavy' })
+
+      result2 = limiter.throttle(:user, weight: 1) { 'extra' }
+      expect(result2[:allowed]).to be false
+    end
+  end
+
+  describe '#allow!' do
+    it 'returns true when under limit (sliding window)' do
+      limiter = described_class.sliding_window(limit: 5, window: 60)
+      expect(limiter.allow!(:user)).to be true
+    end
+
+    it 'raises RateLimitExceeded when over limit (sliding window)' do
+      limiter = described_class.sliding_window(limit: 1, window: 60)
+      limiter.allow?(:user)
+      expect { limiter.allow!(:user) }.to raise_error(Philiprehberger::RateLimiter::RateLimitExceeded)
+    end
+
+    it 'includes the key in the exception' do
+      limiter = described_class.sliding_window(limit: 1, window: 60)
+      limiter.allow?(:user)
+      begin
+        limiter.allow!(:user)
+      rescue Philiprehberger::RateLimiter::RateLimitExceeded => e
+        expect(e.key).to eq(:user)
+        expect(e.message).to include('user')
+      end
+    end
+
+    it 'returns true when under limit (token bucket)' do
+      limiter = described_class.token_bucket(rate: 10, capacity: 5)
+      expect(limiter.allow!(:api)).to be true
+    end
+
+    it 'raises RateLimitExceeded when over limit (token bucket)' do
+      limiter = described_class.token_bucket(rate: 0.001, capacity: 1)
+      limiter.allow?(:api)
+      expect { limiter.allow!(:api) }.to raise_error(Philiprehberger::RateLimiter::RateLimitExceeded)
+    end
+  end
+
+  describe '#keys' do
+    it 'returns empty array initially (sliding window)' do
+      limiter = described_class.sliding_window(limit: 5, window: 60)
+      expect(limiter.keys).to eq([])
+    end
+
+    it 'returns tracked keys (sliding window)' do
+      limiter = described_class.sliding_window(limit: 5, window: 60)
+      limiter.allow?(:user_a)
+      limiter.allow?(:user_b)
+      expect(limiter.keys).to contain_exactly('user_a', 'user_b')
+    end
+
+    it 'returns tracked keys (token bucket)' do
+      limiter = described_class.token_bucket(rate: 10, capacity: 50)
+      limiter.allow?(:key_1)
+      limiter.allow?(:key_2)
+      expect(limiter.keys).to contain_exactly('key_1', 'key_2')
+    end
+
+    it 'reflects cleared keys after clear' do
+      limiter = described_class.sliding_window(limit: 5, window: 60)
+      limiter.allow?(:user)
+      limiter.clear
+      expect(limiter.keys).to eq([])
+    end
+  end
 end

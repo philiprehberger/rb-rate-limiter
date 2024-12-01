@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-04-09
+
+### Added
+- `#throttle(key, weight:) { ... }` to execute a block only when allowed, returning `{ allowed:, value: }`
+- `#allow!(key, weight:)` that raises `RateLimitExceeded` on rejection
+- `#keys` to list all currently tracked keys
+- `RateLimitExceeded` error class with `key` accessor
+
 ## [0.5.2] - 2026-04-07
 
 ### Added
