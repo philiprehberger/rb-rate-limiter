@@ -4,6 +4,7 @@ require_relative 'rate_limiter/version'
 require_relative 'rate_limiter/stats_tracking'
 require_relative 'rate_limiter/sliding_window'
 require_relative 'rate_limiter/token_bucket'
+require_relative 'rate_limiter/noop'
 
 module Philiprehberger
   module RateLimiter
@@ -26,6 +27,13 @@ module Philiprehberger
 
     def self.token_bucket(rate:, capacity:)
       TokenBucket.new(rate: rate, capacity: capacity)
+    end
+
+    # Build a no-op limiter that always allows requests.
+    #
+    # @return [Noop]
+    def self.noop
+      Noop.new
     end
   end
 end

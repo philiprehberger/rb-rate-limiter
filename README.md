@@ -58,6 +58,16 @@ else
 end
 ```
 
+### No-op Limiter
+
+A limiter that always allows requests — useful in test environments or when a feature is behind a kill-switch.
+
+```ruby
+limiter = Philiprehberger::RateLimiter.noop
+limiter.allow?("anyone")    # => true
+limiter.remaining("anyone") # => Float::INFINITY
+```
+
 ### Peeking Without Consuming
 
 ```ruby
@@ -192,6 +202,7 @@ limiter.clear              # clear state for all keys
 |--------|-------------|
 | `RateLimiter.sliding_window(limit:, window:)` | Create a sliding window limiter |
 | `RateLimiter.token_bucket(rate:, capacity:)` | Create a token bucket limiter |
+| `RateLimiter.noop` | Create a limiter that always allows requests |
 | `#allow?(key, weight: 1)` | Check and consume token(s); returns `true`/`false` |
 | `#allow!(key, weight: 1)` | Like `allow?` but raises `RateLimitExceeded` on rejection |
 | `#throttle(key, weight: 1) { }` | Execute block if allowed; returns `{ allowed:, value: }` |
