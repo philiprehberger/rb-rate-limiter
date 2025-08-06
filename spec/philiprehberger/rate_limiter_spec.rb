@@ -239,6 +239,37 @@ RSpec.describe Philiprehberger::RateLimiter::SlidingWindow do
     end
   end
 
+  describe '#drain' do
+    it 'returns the remaining count for a fresh key' do
+      expect(limiter.drain('user1')).to eq(3)
+    end
+
+    it 'exhausts capacity so subsequent requests are rejected' do
+      limiter.drain('user1')
+      expect(limiter.allow?('user1')).to be false
+    end
+
+    it 'sets remaining to zero' do
+      limiter.drain('user1')
+      expect(limiter.remaining('user1')).to eq(0)
+    end
+
+    it 'returns only the remaining count after partial consumption' do
+      2.times { limiter.allow?('user1') }
+      expect(limiter.drain('user1')).to eq(1)
+    end
+
+    it 'returns zero when already exhausted' do
+      3.times { limiter.allow?('user1') }
+      expect(limiter.drain('user1')).to eq(0)
+    end
+
+    it 'does not affect other keys' do
+      limiter.drain('user1')
+      expect(limiter.allow?('user2')).to be true
+    end
+  end
+
   describe 'thread safety' do
     it 'handles concurrent access without errors' do
       window_limiter = described_class.new(limit: 100, window: 10)
@@ -468,6 +499,41 @@ RSpec.describe Philiprehberger::RateLimiter::TokenBucket do
     end
   end
 
+  describe '#drain' do
+    it 'returns the integer floor of drained tokens for a fresh key' do
+      expect(limiter.drain('user1')).to eq(3)
+    end
+
+    it 'exhausts tokens so subsequent requests are rejected' do
+      limiter.drain('user1')
+      expect(limiter.allow?('user1')).to be false
+    end
+
+    it 'sets remaining to zero' do
+      limiter.drain('user1')
+      expect(limiter.remaining('user1')).to eq(0)
+    end
+
+    it 'returns the remaining count after partial consumption' do
+      2.times { limiter.allow?('user1') }
+      expect(limiter.drain('user1')).to eq(1)
+    end
+
+    it 'returns zero when already drained' do
+      limiter.drain('user1')
+      expect(limiter.drain('user1')).to eq(0)
+    end
+
+    it 'does not affect other keys' do
+      limiter.drain('user1')
+      expect(limiter.allow?('user2')).to be true
+    end
+
+    it 'returns an Integer' do
+      expect(limiter.drain('user1')).to be_a(Integer)
+    end
+  end
+
   describe 'thread safety' do
     it 'handles concurrent access without errors' do
       bucket = described_class.new(rate: 1000, capacity: 100)
@@ -476,6 +542,25 @@ RSpec.describe Philiprehberger::RateLimiter::TokenBucket do
       end
       threads.each(&:join)
       expect(bucket.remaining('shared')).to be >= 0
+    end
+  end
+end
+
+RSpec.describe Philiprehberger::RateLimiter::Noop do
+  subject(:limiter) { described_class.new }
+
+  describe '#drain' do
+    it 'returns Float::INFINITY to match #remaining' do
+      expect(limiter.drain('user1')).to eq(Float::INFINITY)
+    end
+
+    it 'does not change subsequent allow? results' do
+      limiter.drain('user1')
+      expect(limiter.allow?('user1')).to be true
+    end
+
+    it 'defaults the key to :default' do
+      expect(limiter.drain).to eq(Float::INFINITY)
     end
   end
 end

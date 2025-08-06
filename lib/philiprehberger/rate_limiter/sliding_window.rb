@@ -52,6 +52,14 @@ module Philiprehberger
         @mutex.synchronize { refund_entries(key, amount) }
       end
 
+      # Forcefully consume all remaining capacity for a key.
+      #
+      # @param key [Symbol, String] the rate limit key
+      # @return [Integer] the number of slots drained
+      def drain(key = :default)
+        @mutex.synchronize { drain_entries(key) }
+      end
+
       # Seconds until the next request would be allowed
       #
       # @param key [Symbol, String] the rate limit key
@@ -123,6 +131,14 @@ module Philiprehberger
         entries = fetch_entries(key)
         [amount, entries.length].min.times { entries.pop }
         nil
+      end
+
+      def drain_entries(key)
+        cleanup(key)
+        entries = fetch_entries(key)
+        remaining = [@limit - entries.length, 0].max
+        remaining.times { entries << now }
+        remaining
       end
 
       def count_remaining(key)
