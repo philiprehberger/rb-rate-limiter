@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-04-16
+
+### Added
+- `retry_after(key)` on `SlidingWindow`, `TokenBucket`, and `Noop` — returns seconds until the next allowed request (0 if allowed now). Suitable for the HTTP `Retry-After` header.
+
 ## [0.8.0] - 2026-04-16
 
 ### Added

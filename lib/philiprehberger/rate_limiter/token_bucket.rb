@@ -76,6 +76,23 @@ module Philiprehberger
         end
       end
 
+      # Seconds until the next request would be allowed, suitable for the HTTP
+      # Retry-After header. Returns 0.0 when a token is available right now.
+      #
+      # @param key [Symbol, String] the rate limit key
+      # @return [Float] seconds until 1 token is available (0.0 if allowed now)
+      def retry_after(key = :default)
+        @mutex.synchronize do
+          refill(key)
+          bucket = @store[key.to_s]
+          tokens = bucket ? bucket[:tokens] : @capacity
+          return 0.0 if tokens >= 1.0
+
+          needed = 1.0 - tokens
+          needed / @rate
+        end
+      end
+
       private
 
       def try_acquire(key, weight)

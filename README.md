@@ -180,6 +180,19 @@ limiter.wait_time  # => 12.5 (seconds to wait)
 limiter.window_reset_at  # => 2026-04-01 12:01:00 +0000 (Time when window expires)
 ```
 
+### Retry-After Header
+
+Use `retry_after(key)` to get the number of seconds until the next request is allowed — ready to emit as an HTTP `Retry-After` header:
+
+```ruby
+unless limiter.allow?("user:123")
+  response.headers["Retry-After"] = limiter.retry_after("user:123").ceil.to_s
+  return too_many_requests
+end
+```
+
+It returns `0.0` when a request is allowed right now. On `SlidingWindow` it reports when the oldest hit in the window will expire; on `TokenBucket` it reports the time to refill one full token; `Noop` always returns `0.0`.
+
 ### Resetting a Key
 
 ```ruby
@@ -224,6 +237,7 @@ limiter.remaining("user:123")# => 0
 | `#info(key)` | Return usage info hash (remaining, reset_at, limit/capacity, used/tokens) |
 | `#stats(key)` | Return `{ allowed:, rejected: }` counters for a key |
 | `#wait_time(key)` | Seconds until next request is allowed (0 if now). `TokenBucket` also accepts `weight:` keyword argument |
+| `#retry_after(key)` | Seconds until the next allowed request (0.0 if allowed now); ready for the HTTP `Retry-After` header |
 | `SlidingWindow#window_reset_at(key)` | Time when current window expires |
 | `#refund(key, amount: 1)` | Return tokens/slots on error |
 | `#drain(key)` | Forcefully consume all remaining capacity; returns amount drained |
