@@ -46,7 +46,7 @@ module Philiprehberger
       def refill(key)
         bucket = fetch_bucket(key)
         elapsed = now - bucket[:last_refill]
-        bucket[:tokens] = [bucket[:tokens] + elapsed * @rate, @capacity].min
+        bucket[:tokens] = [bucket[:tokens] + (elapsed * @rate), @capacity].min
         bucket[:last_refill] = now
       end
 
