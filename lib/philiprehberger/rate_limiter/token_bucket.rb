@@ -34,15 +34,8 @@ module Philiprehberger
       # @return [Hash] remaining tokens, capacity, and rate
       def info(key)
         @mutex.synchronize do
-          refill(key)
-          bucket = fetch_bucket(key)
-          tokens = [bucket[:tokens], @capacity].min
-          {
-            remaining: tokens.to_i,
-            capacity: @capacity.to_i,
-            rate: @rate,
-            tokens: tokens
-          }
+          tokens = token_count(key)
+          { remaining: tokens.to_i, capacity: @capacity.to_i, rate: @rate, tokens: tokens }
         end
       end
 
