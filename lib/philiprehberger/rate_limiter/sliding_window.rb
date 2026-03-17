@@ -1,8 +1,12 @@
 # frozen_string_literal: true
 
+require_relative "stats_tracking"
+
 module Philiprehberger
   module RateLimiter
     class SlidingWindow
+      include StatsTracking
+
       attr_reader :limit, :window
 
       def initialize(limit:, window:)
@@ -10,10 +14,11 @@ module Philiprehberger
         @window = window
         @store = {}
         @mutex = Mutex.new
+        init_stats
       end
 
-      def allow?(key)
-        @mutex.synchronize { try_acquire(key) }
+      def allow?(key, weight: 1)
+        @mutex.synchronize { try_acquire(key, weight) }
       end
 
       def peek(key)
@@ -28,38 +33,53 @@ module Philiprehberger
         @mutex.synchronize { @store.delete(key.to_s) }
       end
 
-      # Return usage info for a key.
-      #
-      # @param key [String, Symbol] the rate limit key
-      # @return [Hash] remaining, limit, window, and used counts
       def info(key)
-        @mutex.synchronize do
-          cleanup(key)
-          entries = fetch_entries(key)
-          {
-            remaining: [@limit - entries.length, 0].max,
-            limit: @limit,
-            window: @window,
-            used: entries.length
-          }
-        end
+        @mutex.synchronize { build_info(key) }
+      end
+
+      def refund(key, amount: 1)
+        @mutex.synchronize { refund_entries(key, amount) }
       end
 
       private
 
-      def try_acquire(key)
+      def try_acquire(key, weight)
         cleanup(key)
         entries = fetch_entries(key)
-        return false if entries.length >= @limit
+        return reject_request(key) if entries.length + weight > @limit
 
-        entries << now
+        weight.times { entries << now }
+        record_allowed(key)
         true
+      end
+
+      def reject_request(key)
+        record_rejected(key)
+        false
+      end
+
+      def build_info(key)
+        cleanup(key)
+        entries = fetch_entries(key)
+        oldest = entries.min
+        {
+          remaining: [@limit - entries.length, 0].max,
+          reset_at: oldest ? oldest + @window : nil,
+          limit: @limit,
+          window: @window,
+          used: entries.length
+        }
+      end
+
+      def refund_entries(key, amount)
+        entries = fetch_entries(key)
+        [amount, entries.length].min.times { entries.pop }
+        nil
       end
 
       def count_remaining(key)
         cleanup(key)
-        entries = fetch_entries(key)
-        [@limit - entries.length, 0].max
+        [@limit - fetch_entries(key).length, 0].max
       end
 
       def cleanup(key)

@@ -1,8 +1,12 @@
 # frozen_string_literal: true
 
+require_relative "stats_tracking"
+
 module Philiprehberger
   module RateLimiter
     class TokenBucket
+      include StatsTracking
+
       attr_reader :rate, :capacity
 
       def initialize(rate:, capacity:)
@@ -10,10 +14,11 @@ module Philiprehberger
         @capacity = capacity.to_f
         @store = {}
         @mutex = Mutex.new
+        init_stats
       end
 
-      def allow?(key)
-        @mutex.synchronize { try_acquire(key) }
+      def allow?(key, weight: 1)
+        @mutex.synchronize { try_acquire(key, weight.to_f) }
       end
 
       def peek(key)
@@ -28,26 +33,49 @@ module Philiprehberger
         @mutex.synchronize { @store.delete(key.to_s) }
       end
 
-      # Return usage info for a key.
-      #
-      # @param key [String, Symbol] the rate limit key
-      # @return [Hash] remaining tokens, capacity, and rate
       def info(key)
-        @mutex.synchronize do
-          tokens = token_count(key)
-          { remaining: tokens.to_i, capacity: @capacity.to_i, rate: @rate, tokens: tokens }
-        end
+        @mutex.synchronize { build_info(key) }
+      end
+
+      def refund(key, amount: 1)
+        @mutex.synchronize { refund_tokens(key, amount.to_f) }
       end
 
       private
 
-      def try_acquire(key)
+      def try_acquire(key, weight)
         refill(key)
         bucket = fetch_bucket(key)
-        return false if bucket[:tokens] < 1.0
+        return reject_request(key) if bucket[:tokens] < weight
 
-        bucket[:tokens] -= 1.0
+        bucket[:tokens] -= weight
+        record_allowed(key)
         true
+      end
+
+      def reject_request(key)
+        record_rejected(key)
+        false
+      end
+
+      def build_info(key)
+        tokens = token_count(key)
+        deficit = @capacity - tokens
+        reset_at = deficit.positive? ? now + (deficit / @rate) : nil
+        {
+          remaining: tokens.to_i,
+          reset_at: reset_at,
+          capacity: @capacity.to_i,
+          rate: @rate,
+          tokens: tokens
+        }
+      end
+
+      def refund_tokens(key, amount)
+        refill(key)
+        bucket = fetch_bucket(key)
+        bucket[:tokens] = [bucket[:tokens] + amount, @capacity].min
+        nil
       end
 
       def token_count(key)
