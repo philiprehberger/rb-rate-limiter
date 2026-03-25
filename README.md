@@ -4,7 +4,7 @@
 [![Gem Version](https://badge.fury.io/rb/philiprehberger-rate_limiter.svg)](https://rubygems.org/gems/philiprehberger-rate_limiter)
 [![License](https://img.shields.io/github/license/philiprehberger/rb-rate-limiter)](LICENSE)
 
-In-memory rate limiter with sliding window and token bucket algorithms, per-key tracking, and thread safety.
+In-memory rate limiter with sliding window and token bucket
 
 > **Note:** This is a single-process, in-memory rate limiter. It does not share state across processes or servers. For distributed rate limiting, use a centralized store like Redis.
 
