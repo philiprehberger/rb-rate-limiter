@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative "stats_tracking"
+require_relative 'stats_tracking'
 
 module Philiprehberger
   module RateLimiter

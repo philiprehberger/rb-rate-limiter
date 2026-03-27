@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "philiprehberger/rate_limiter"
+require 'philiprehberger/rate_limiter'
 
 RSpec.configure do |config|
   config.expect_with :rspec do |expectations|
