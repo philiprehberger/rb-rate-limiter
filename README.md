@@ -129,6 +129,24 @@ limiter = Philiprehberger::RateLimiter
   .on_reject { |key| logger.warn("Rejected: #{key}") }
 ```
 
+### Wait Time
+
+Check how long until the next request is allowed:
+
+```ruby
+limiter = Philiprehberger::RateLimiter.sliding_window(limit: 100, window: 60)
+limiter.wait_time  # => 0.0 (allowed now)
+
+# After hitting the limit:
+limiter.wait_time  # => 12.5 (seconds to wait)
+```
+
+### Window Reset
+
+```ruby
+limiter.window_reset_at  # => 2026-04-01 12:01:00 +0000 (Time when window expires)
+```
+
 ### Resetting a Key
 
 ```ruby
@@ -156,6 +174,8 @@ limiter.reset("user:123")
 | `#reset(key)` | Clear all state for a key |
 | `#info(key)` | Return usage info hash (remaining, reset_at, limit/capacity, used/tokens) |
 | `#stats(key)` | Return `{ allowed:, rejected: }` counters for a key |
+| `#wait_time(key)` | Seconds until next request is allowed (0 if now) |
+| `SlidingWindow#window_reset_at(key)` | Time when current window expires |
 | `#refund(key, amount: 1)` | Return tokens/slots on error |
 | `#on_reject { \|key\| }` | Register a callback for rejected requests |
 | `SlidingWindow#limit` | Return the configured request limit |
