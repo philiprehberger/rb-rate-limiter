@@ -11,14 +11,14 @@ Gem::Specification.new do |spec|
   spec.summary = 'In-memory rate limiter with sliding window and token bucket'
   spec.description = 'A zero-dependency Ruby gem for rate limiting with sliding window and ' \
                      'token bucket algorithms, per-key tracking, and thread safety.'
-  spec.homepage      = 'https://philiprehberger.com/open-source-packages/ruby/philiprehberger-rate_limiter'
+  spec.homepage = 'https://philiprehberger.com/open-source-packages/ruby/philiprehberger-rate_limiter'
   spec.license = 'MIT'
   spec.required_ruby_version = '>= 3.1.0'
 
-  spec.metadata['homepage_uri']    = spec.homepage
-  spec.metadata['source_code_uri']       = 'https://github.com/philiprehberger/rb-rate-limiter'
-  spec.metadata['changelog_uri']         = 'https://github.com/philiprehberger/rb-rate-limiter/blob/main/CHANGELOG.md'
-  spec.metadata['bug_tracker_uri']       = 'https://github.com/philiprehberger/rb-rate-limiter/issues'
+  spec.metadata['homepage_uri'] = spec.homepage
+  spec.metadata['source_code_uri'] = 'https://github.com/philiprehberger/rb-rate-limiter'
+  spec.metadata['changelog_uri'] = 'https://github.com/philiprehberger/rb-rate-limiter/blob/main/CHANGELOG.md'
+  spec.metadata['bug_tracker_uri'] = 'https://github.com/philiprehberger/rb-rate-limiter/issues'
   spec.metadata['rubygems_mfa_required'] = 'true'
 
   spec.files = Dir['lib/**/*.rb', 'LICENSE', 'README.md', 'CHANGELOG.md']
