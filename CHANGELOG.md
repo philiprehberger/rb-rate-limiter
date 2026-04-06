@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-04-05
+
+### Fixed
+- Merged duplicate CHANGELOG entries for v0.3.2
+- Documented `weight:` parameter on `TokenBucket#wait_time` in README
+- Added thread-safety note to README
+
 ## [0.5.0] - 2026-04-04
 
 ### Added
@@ -52,8 +59,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Update rubocop configuration for Windows compatibility
-
-## [0.3.2] - 2026-03-21
 
 ### Fixed
 - Standardize Installation section in README

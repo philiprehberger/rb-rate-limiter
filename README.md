@@ -174,7 +174,7 @@ limiter.reset("user:123")
 | `#reset(key)` | Clear all state for a key |
 | `#info(key)` | Return usage info hash (remaining, reset_at, limit/capacity, used/tokens) |
 | `#stats(key)` | Return `{ allowed:, rejected: }` counters for a key |
-| `#wait_time(key)` | Seconds until next request is allowed (0 if now) |
+| `#wait_time(key)` | Seconds until next request is allowed (0 if now). `TokenBucket` also accepts `weight:` keyword argument |
 | `SlidingWindow#window_reset_at(key)` | Time when current window expires |
 | `#refund(key, amount: 1)` | Return tokens/slots on error |
 | `#on_reject { \|key\| }` | Register a callback for rejected requests |
@@ -182,6 +182,10 @@ limiter.reset("user:123")
 | `SlidingWindow#window` | Return the configured window duration (seconds) |
 | `TokenBucket#rate` | Return the configured refill rate (tokens/sec) |
 | `TokenBucket#capacity` | Return the configured token capacity |
+
+## Thread Safety
+
+Both `SlidingWindow` and `TokenBucket` are thread-safe. All operations are protected by a Mutex.
 
 ## Development
 
