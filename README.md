@@ -6,8 +6,6 @@
 
 In-memory rate limiter with sliding window and token bucket
 
-> **Note:** This is a single-process, in-memory rate limiter. It does not share state across processes or servers. For distributed rate limiting, use a centralized store like Redis.
-
 ## Requirements
 
 - Ruby >= 3.1
@@ -150,7 +148,8 @@ limiter.window_reset_at  # => 2026-04-01 12:01:00 +0000 (Time when window expire
 ### Resetting a Key
 
 ```ruby
-limiter.reset("user:123")
+limiter.reset("user:123")  # clear state for one key
+limiter.clear              # clear state for all keys
 ```
 
 ### Sliding Window vs Token Bucket
@@ -172,6 +171,7 @@ limiter.reset("user:123")
 | `#peek(key)` | Check availability without consuming |
 | `#remaining(key)` | Return remaining request/token count |
 | `#reset(key)` | Clear all state for a key |
+| `#clear` | Clear all state for every tracked key |
 | `#info(key)` | Return usage info hash (remaining, reset_at, limit/capacity, used/tokens) |
 | `#stats(key)` | Return `{ allowed:, rejected: }` counters for a key |
 | `#wait_time(key)` | Seconds until next request is allowed (0 if now). `TokenBucket` also accepts `weight:` keyword argument |
@@ -182,10 +182,6 @@ limiter.reset("user:123")
 | `SlidingWindow#window` | Return the configured window duration (seconds) |
 | `TokenBucket#rate` | Return the configured refill rate (tokens/sec) |
 | `TokenBucket#capacity` | Return the configured token capacity |
-
-## Thread Safety
-
-Both `SlidingWindow` and `TokenBucket` are thread-safe. All operations are protected by a Mutex.
 
 ## Development
 
