@@ -127,6 +127,31 @@ limiter = Philiprehberger::RateLimiter
   .on_reject { |key| logger.warn("Rejected: #{key}") }
 ```
 
+### Throttle (Execute if Allowed)
+
+```ruby
+result = limiter.throttle("user:123") { make_api_call }
+result[:allowed]  # => true
+result[:value]    # => the return value of make_api_call
+
+# When rejected:
+result = limiter.throttle("user:123") { make_api_call }
+result[:allowed]  # => false
+result[:value]    # => nil
+```
+
+### Allow! (Raise on Rejection)
+
+```ruby
+limiter.allow!("user:123")  # => true, or raises RateLimitExceeded
+```
+
+### Listing Tracked Keys
+
+```ruby
+limiter.keys  # => ["user:123", "user:456"]
+```
+
 ### Wait Time
 
 Check how long until the next request is allowed:
@@ -168,10 +193,13 @@ limiter.clear              # clear state for all keys
 | `RateLimiter.sliding_window(limit:, window:)` | Create a sliding window limiter |
 | `RateLimiter.token_bucket(rate:, capacity:)` | Create a token bucket limiter |
 | `#allow?(key, weight: 1)` | Check and consume token(s); returns `true`/`false` |
+| `#allow!(key, weight: 1)` | Like `allow?` but raises `RateLimitExceeded` on rejection |
+| `#throttle(key, weight: 1) { }` | Execute block if allowed; returns `{ allowed:, value: }` |
 | `#peek(key)` | Check availability without consuming |
 | `#remaining(key)` | Return remaining request/token count |
 | `#reset(key)` | Clear all state for a key |
 | `#clear` | Clear all state for every tracked key |
+| `#keys` | Return all currently tracked keys |
 | `#info(key)` | Return usage info hash (remaining, reset_at, limit/capacity, used/tokens) |
 | `#stats(key)` | Return `{ allowed:, rejected: }` counters for a key |
 | `#wait_time(key)` | Seconds until next request is allowed (0 if now). `TokenBucket` also accepts `weight:` keyword argument |

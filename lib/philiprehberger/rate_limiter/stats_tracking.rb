@@ -12,6 +12,39 @@ module Philiprehberger
         self
       end
 
+      # Execute a block if allowed, returning the result in a hash.
+      #
+      # @param key [Symbol, String] the rate limit key
+      # @param weight [Integer] tokens to consume
+      # @yield the block to execute when allowed
+      # @return [Hash] { allowed: true, value: result } or { allowed: false, value: nil }
+      def throttle(key, weight: 1, &block)
+        if allow?(key, weight: weight)
+          { allowed: true, value: block.call }
+        else
+          { allowed: false, value: nil }
+        end
+      end
+
+      # Like allow? but raises RateLimitExceeded when rejected.
+      #
+      # @param key [Symbol, String] the rate limit key
+      # @param weight [Integer] tokens to consume
+      # @return [true]
+      # @raise [RateLimitExceeded] if the rate limit is exceeded
+      def allow!(key, weight: 1)
+        return true if allow?(key, weight: weight)
+
+        raise RateLimitExceeded, key
+      end
+
+      # Return all currently tracked keys.
+      #
+      # @return [Array<String>]
+      def keys
+        @mutex.synchronize { @store.keys }
+      end
+
       private
 
       def fetch_stats(key)
