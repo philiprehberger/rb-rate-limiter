@@ -78,6 +78,25 @@ module Philiprehberger
         end
       end
 
+      # Seconds until the next request would be allowed, suitable for the HTTP
+      # Retry-After header. Returns 0.0 when a request is allowed right now.
+      #
+      # @param key [Symbol, String] the rate limit key
+      # @return [Float] seconds until next allowed request (0.0 if allowed now)
+      def retry_after(key = :default)
+        @mutex.synchronize do
+          cleanup(key)
+          entries = fetch_entries(key)
+          return 0.0 if entries.length < @limit
+
+          oldest = entries.min
+          return 0.0 if oldest.nil?
+
+          wait = (oldest + @window) - now
+          [wait, 0.0].max
+        end
+      end
+
       # Time when the current window expires
       #
       # @param key [Symbol, String] the rate limit key

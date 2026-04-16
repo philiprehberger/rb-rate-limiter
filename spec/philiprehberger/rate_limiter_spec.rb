@@ -615,6 +615,92 @@ RSpec.describe Philiprehberger::RateLimiter do
     end
   end
 
+  describe 'SlidingWindow#retry_after' do
+    it 'returns 0.0 when under the limit' do
+      limiter = described_class.sliding_window(limit: 3, window: 60)
+      expect(limiter.retry_after(:user)).to eq(0.0)
+    end
+
+    it 'returns 0.0 for an unknown key' do
+      limiter = described_class.sliding_window(limit: 3, window: 60)
+      expect(limiter.retry_after(:never_seen)).to eq(0.0)
+    end
+
+    it 'returns a positive value bounded by the window when at the limit' do
+      limiter = described_class.sliding_window(limit: 2, window: 60)
+      2.times { limiter.allow?(:user) }
+      retry_after = limiter.retry_after(:user)
+      expect(retry_after).to be > 0
+      expect(retry_after).to be <= 60
+    end
+
+    it 'returns 0.0 after the oldest hit has aged out (stubbed clock)' do
+      limiter = described_class.sliding_window(limit: 1, window: 60)
+      now = 1_000.0
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(now)
+      limiter.allow?(:user)
+
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(now + 61)
+      expect(limiter.retry_after(:user)).to eq(0.0)
+    end
+
+    it 'shrinks as time advances toward the window edge (stubbed clock)' do
+      limiter = described_class.sliding_window(limit: 1, window: 60)
+      now = 2_000.0
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(now)
+      limiter.allow?(:user)
+
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(now + 10)
+      first = limiter.retry_after(:user)
+
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(now + 40)
+      second = limiter.retry_after(:user)
+
+      expect(first).to be > second
+      expect(second).to be > 0
+    end
+
+    it 'defaults the key to :default' do
+      limiter = described_class.sliding_window(limit: 5, window: 60)
+      expect(limiter.retry_after).to eq(0.0)
+    end
+  end
+
+  describe 'TokenBucket#retry_after' do
+    it 'returns 0.0 when a token is available' do
+      limiter = described_class.token_bucket(rate: 10, capacity: 10)
+      expect(limiter.retry_after(:user)).to eq(0.0)
+    end
+
+    it 'returns 0.0 for a fresh (full) key' do
+      limiter = described_class.token_bucket(rate: 5, capacity: 5)
+      expect(limiter.retry_after(:never_seen)).to eq(0.0)
+    end
+
+    it 'returns time-to-refill-1-token when the bucket is empty (stubbed clock)' do
+      limiter = described_class.token_bucket(rate: 2, capacity: 1)
+      now = 10_000.0
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(now)
+      expect(limiter.allow?(:user)).to be true
+
+      expect(limiter.retry_after(:user)).to be_within(0.0001).of(0.5)
+    end
+
+    it 'reports ~1/rate seconds when the bucket has just been emptied' do
+      limiter = described_class.token_bucket(rate: 4, capacity: 1)
+      now = 20_000.0
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(now)
+      limiter.allow?(:user)
+
+      expect(limiter.retry_after(:user)).to be_within(0.0001).of(0.25)
+    end
+
+    it 'defaults the key to :default' do
+      limiter = described_class.token_bucket(rate: 10, capacity: 10)
+      expect(limiter.retry_after).to eq(0.0)
+    end
+  end
+
   describe '#throttle' do
     it 'executes block and returns allowed hash when under limit (sliding window)' do
       limiter = described_class.sliding_window(limit: 5, window: 60)

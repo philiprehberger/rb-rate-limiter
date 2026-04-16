@@ -30,6 +30,10 @@ module Philiprehberger
         Float::INFINITY
       end
 
+      def retry_after(_key = :default)
+        0.0
+      end
+
       def clear
         nil
       end

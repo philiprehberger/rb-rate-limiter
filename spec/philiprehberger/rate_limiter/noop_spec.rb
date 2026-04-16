@@ -36,4 +36,12 @@ RSpec.describe Philiprehberger::RateLimiter::Noop do
   it 'is reachable via RateLimiter.noop' do
     expect(Philiprehberger::RateLimiter.noop).to be_a(described_class)
   end
+
+  it 'always reports 0.0 for retry_after' do
+    expect(limiter.retry_after('k')).to eq(0.0)
+  end
+
+  it 'defaults the retry_after key to :default' do
+    expect(limiter.retry_after).to eq(0.0)
+  end
 end
