@@ -52,6 +52,14 @@ module Philiprehberger
         @mutex.synchronize { refund_tokens(key, amount.to_f) }
       end
 
+      # Forcefully consume all remaining tokens for a key.
+      #
+      # @param key [Symbol, String] the rate limit key
+      # @return [Integer] the integer floor of tokens drained
+      def drain(key = :default)
+        @mutex.synchronize { drain_tokens(key) }
+      end
+
       # Seconds until the next request would be allowed
       #
       # @param key [Symbol, String] the rate limit key
@@ -103,6 +111,14 @@ module Philiprehberger
         bucket = fetch_bucket(key)
         bucket[:tokens] = [bucket[:tokens] + amount, @capacity].min
         nil
+      end
+
+      def drain_tokens(key)
+        refill(key)
+        bucket = fetch_bucket(key)
+        drained = [bucket[:tokens], 0.0].max.floor
+        bucket[:tokens] = 0.0
+        drained
       end
 
       def token_count(key)

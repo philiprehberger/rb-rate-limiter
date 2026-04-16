@@ -26,6 +26,10 @@ module Philiprehberger
         nil
       end
 
+      def drain(_key = :default)
+        Float::INFINITY
+      end
+
       def clear
         nil
       end

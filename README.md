@@ -187,6 +187,16 @@ limiter.reset("user:123")  # clear state for one key
 limiter.clear              # clear state for all keys
 ```
 
+### Draining a Key
+
+Forcefully consume all remaining capacity for a key — useful for coordinated lockouts or kill-switch flows:
+
+```ruby
+limiter.drain("user:123")    # => 42 (number of slots/tokens drained)
+limiter.allow?("user:123")   # => false
+limiter.remaining("user:123")# => 0
+```
+
 ### Sliding Window vs Token Bucket
 
 | Feature | SlidingWindow | TokenBucket |
@@ -216,6 +226,7 @@ limiter.clear              # clear state for all keys
 | `#wait_time(key)` | Seconds until next request is allowed (0 if now). `TokenBucket` also accepts `weight:` keyword argument |
 | `SlidingWindow#window_reset_at(key)` | Time when current window expires |
 | `#refund(key, amount: 1)` | Return tokens/slots on error |
+| `#drain(key)` | Forcefully consume all remaining capacity; returns amount drained |
 | `#on_reject { \|key\| }` | Register a callback for rejected requests |
 | `SlidingWindow#limit` | Return the configured request limit |
 | `SlidingWindow#window` | Return the configured window duration (seconds) |
