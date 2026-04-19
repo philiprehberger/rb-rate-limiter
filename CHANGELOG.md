@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-04-18
+
+### Added
+- `#used(key)` on `SlidingWindow`, `TokenBucket`, and `Noop` — returns an `Integer` count of currently consumed slots/tokens; complements `#remaining` without allocating an `#info` hash
+
 ## [0.9.0] - 2026-04-16
 
 ### Added

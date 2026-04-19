@@ -29,6 +29,17 @@ module Philiprehberger
         @mutex.synchronize { count_remaining(key) }
       end
 
+      # Number of currently consumed slots for a key (after expiring old entries).
+      #
+      # @param key [Symbol, String] the rate limit key
+      # @return [Integer] count of active entries in the window
+      def used(key)
+        @mutex.synchronize do
+          cleanup(key)
+          fetch_entries(key).length
+        end
+      end
+
       def reset(key)
         @mutex.synchronize { @store.delete(key.to_s) }
       end

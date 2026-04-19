@@ -29,6 +29,14 @@ module Philiprehberger
         @mutex.synchronize { token_count(key).to_i }
       end
 
+      # Number of currently consumed tokens for a key.
+      #
+      # @param key [Symbol, String] the rate limit key
+      # @return [Integer] capacity minus remaining tokens
+      def used(key)
+        @mutex.synchronize { @capacity.to_i - token_count(key).to_i }
+      end
+
       def reset(key)
         @mutex.synchronize { @store.delete(key.to_s) }
       end
