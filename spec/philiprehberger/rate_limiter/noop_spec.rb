@@ -17,6 +17,15 @@ RSpec.describe Philiprehberger::RateLimiter::Noop do
     expect(limiter.remaining('k')).to eq(Float::INFINITY)
   end
 
+  it 'always reports 0 for used' do
+    1000.times { limiter.allow?('k') }
+    expect(limiter.used('k')).to eq(0)
+  end
+
+  it 'defaults the used key to :default' do
+    expect(limiter.used).to eq(0)
+  end
+
   it 'throttles blocks as allowed' do
     result = limiter.throttle('k') { 42 }
     expect(result).to eq(allowed: true, value: 42)

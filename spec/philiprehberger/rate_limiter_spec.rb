@@ -108,6 +108,33 @@ RSpec.describe Philiprehberger::RateLimiter::SlidingWindow do
     end
   end
 
+  describe '#used' do
+    it 'returns 0 for a fresh key' do
+      expect(limiter.used('user1')).to eq(0)
+    end
+
+    it 'returns the number of consumed slots after allowed calls' do
+      2.times { limiter.allow?('user1') }
+      expect(limiter.used('user1')).to eq(2)
+    end
+
+    it 'returns an Integer' do
+      limiter.allow?('user1')
+      expect(limiter.used('user1')).to be_a(Integer)
+    end
+
+    it 'drops after the window expires (stubbed clock)' do
+      window_limiter = described_class.new(limit: 3, window: 60)
+      now = 5_000.0
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(now)
+      2.times { window_limiter.allow?('user1') }
+      expect(window_limiter.used('user1')).to eq(2)
+
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(now + 61)
+      expect(window_limiter.used('user1')).to eq(0)
+    end
+  end
+
   describe '#limit' do
     it 'returns the configured limit' do
       expect(limiter.limit).to eq(3)
@@ -365,6 +392,46 @@ RSpec.describe Philiprehberger::RateLimiter::TokenBucket do
       3.times { limiter.allow?('user1') }
       limiter.reset('user1')
       expect(limiter.remaining('user1')).to eq(3)
+    end
+  end
+
+  describe '#used' do
+    it 'returns 0 for a fresh key' do
+      bucket = described_class.new(rate: 0.001, capacity: 3)
+      expect(bucket.used('user1')).to eq(0)
+    end
+
+    it 'returns the number of consumed tokens (stubbed clock)' do
+      bucket = described_class.new(rate: 10, capacity: 3)
+      now = 7_000.0
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(now)
+      2.times { bucket.allow?('user1') }
+      expect(bucket.used('user1')).to eq(2)
+    end
+
+    it 'returns an Integer' do
+      bucket = described_class.new(rate: 0.001, capacity: 3)
+      bucket.allow?('user1')
+      expect(bucket.used('user1')).to be_a(Integer)
+    end
+
+    it 'plus #remaining equals capacity (stubbed clock)' do
+      bucket = described_class.new(rate: 0.001, capacity: 3)
+      now = 8_000.0
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(now)
+      2.times { bucket.allow?('user1') }
+      expect(bucket.used('user1') + bucket.remaining('user1')).to eq(bucket.capacity.to_i)
+    end
+
+    it 'drops back to 0 after tokens refill (stubbed clock)' do
+      bucket = described_class.new(rate: 10, capacity: 3)
+      now = 9_000.0
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(now)
+      3.times { bucket.allow?('user1') }
+      expect(bucket.used('user1')).to eq(3)
+
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(now + 10)
+      expect(bucket.used('user1')).to eq(0)
     end
   end
 

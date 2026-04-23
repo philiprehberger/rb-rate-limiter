@@ -22,6 +22,10 @@ module Philiprehberger
         Float::INFINITY
       end
 
+      def used(_key = :default)
+        0
+      end
+
       def reset(_key = :default)
         nil
       end

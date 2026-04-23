@@ -96,6 +96,17 @@ info = limiter.info("user:123")
 
 The `reset_at` value is a monotonic timestamp suitable for computing X-RateLimit-Reset headers. It is `nil` when the key has no usage or is at full capacity.
 
+### Inspect consumed count
+
+Call `used(key)` for a cheap integer count of currently consumed slots/tokens — it complements `remaining(key)` without allocating an `info` hash.
+
+```ruby
+limiter = Philiprehberger::RateLimiter.sliding_window(limit: 100, window: 60)
+3.times { limiter.allow?("user:123") }
+limiter.used("user:123")      # => 3
+limiter.remaining("user:123") # => 97
+```
+
 ### Per-Key Stats
 
 Track allowed and rejected request counts:
@@ -231,6 +242,7 @@ limiter.remaining("user:123")# => 0
 | `#throttle(key, weight: 1) { }` | Execute block if allowed; returns `{ allowed:, value: }` |
 | `#peek(key)` | Check availability without consuming |
 | `#remaining(key)` | Return remaining request/token count |
+| `#used(key)` | Return `Integer` count of currently consumed slots/tokens (available on `SlidingWindow`, `TokenBucket`, and `Noop`) |
 | `#reset(key)` | Clear all state for a key |
 | `#clear` | Clear all state for every tracked key |
 | `#keys` | Return all currently tracked keys |
