@@ -73,6 +73,21 @@ RSpec.describe Philiprehberger::RateLimiter::SlidingWindow do
     end
   end
 
+  describe '#allow_batch' do
+    it 'returns a Hash with each input key' do
+      result = limiter.allow_batch(%w[a b c])
+      expect(result).to be_a(Hash)
+      expect(result.keys).to eq(%w[a b c])
+      expect(result.values).to all(be true)
+    end
+
+    it 'returns mixed allowed/rejected when limits are exceeded' do
+      3.times { limiter.allow?('user1') }
+      result = limiter.allow_batch(%w[user1 user2])
+      expect(result).to eq({ 'user1' => false, 'user2' => true })
+    end
+  end
+
   describe '#peek' do
     it 'returns true when requests are available' do
       expect(limiter.peek('user1')).to be true
@@ -357,6 +372,21 @@ RSpec.describe Philiprehberger::RateLimiter::TokenBucket do
     it 'defaults weight to 1' do
       limiter.allow?('user1')
       expect(limiter.remaining('user1')).to eq(2)
+    end
+  end
+
+  describe '#allow_batch' do
+    it 'returns a Hash with each input key' do
+      result = limiter.allow_batch(%w[a b c])
+      expect(result).to be_a(Hash)
+      expect(result.keys).to eq(%w[a b c])
+      expect(result.values).to all(be true)
+    end
+
+    it 'returns mixed allowed/rejected when limits are exceeded' do
+      3.times { limiter.allow?('user1') }
+      result = limiter.allow_batch(%w[user1 user2])
+      expect(result).to eq({ 'user1' => false, 'user2' => true })
     end
   end
 

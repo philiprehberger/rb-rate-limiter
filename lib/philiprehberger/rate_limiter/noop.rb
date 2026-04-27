@@ -9,6 +9,10 @@ module Philiprehberger
         true
       end
 
+      def allow_batch(keys)
+        keys.to_h { |key| [key, true] }
+      end
+
       def allow!(_key = :default, weight: 1)
         _ = weight
         true

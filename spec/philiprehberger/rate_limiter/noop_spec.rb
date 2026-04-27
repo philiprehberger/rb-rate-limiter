@@ -50,6 +50,11 @@ RSpec.describe Philiprehberger::RateLimiter::Noop do
     expect(limiter.retry_after('k')).to eq(0.0)
   end
 
+  it 'returns true for every key in allow_batch' do
+    result = limiter.allow_batch(%w[a b c])
+    expect(result).to eq({ 'a' => true, 'b' => true, 'c' => true })
+  end
+
   it 'defaults the retry_after key to :default' do
     expect(limiter.retry_after).to eq(0.0)
   end

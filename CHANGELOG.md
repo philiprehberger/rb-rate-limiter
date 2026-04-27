@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-04-26
+
+### Added
+- `#allow_batch(keys)` on `SlidingWindow`, `TokenBucket`, and `Noop` — check many keys in a single mutex acquisition, returning `{ key => Boolean }`
+
 ## [0.10.0] - 2026-04-18
 
 ### Added

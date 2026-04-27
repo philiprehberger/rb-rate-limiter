@@ -21,6 +21,16 @@ module Philiprehberger
         @mutex.synchronize { try_acquire(key, weight.to_f) }
       end
 
+      # Check many keys in a single mutex acquisition.
+      #
+      # @param keys [Array<Symbol, String>] the keys to check and consume
+      # @return [Hash{Object => Boolean}] mapping of each key to the allow result
+      def allow_batch(keys)
+        @mutex.synchronize do
+          keys.to_h { |key| [key, try_acquire(key, 1.0)] }
+        end
+      end
+
       def peek(key)
         @mutex.synchronize { token_count(key) >= 1.0 }
       end

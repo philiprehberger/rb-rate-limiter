@@ -75,6 +75,17 @@ limiter.peek("user:123")      # => true/false (does not consume)
 limiter.remaining("user:123") # => number of remaining requests/tokens
 ```
 
+### Batch Checks
+
+Check several keys in one call. The whole batch runs under a single mutex acquisition, so stats and quota updates are consistent across keys.
+
+```ruby
+limiter = Philiprehberger::RateLimiter.sliding_window(limit: 1, window: 60)
+limiter.allow?('user:1')
+limiter.allow_batch(['user:1', 'user:2', 'user:3'])
+# => { 'user:1' => false, 'user:2' => true, 'user:3' => true }
+```
+
 ### Weighted Requests
 
 Consume multiple tokens per request for expensive operations:
@@ -238,6 +249,7 @@ limiter.remaining("user:123")# => 0
 | `RateLimiter.token_bucket(rate:, capacity:)` | Create a token bucket limiter |
 | `RateLimiter.noop` | Create a limiter that always allows requests |
 | `#allow?(key, weight: 1)` | Check and consume token(s); returns `true`/`false` |
+| `#allow_batch(keys)` | Check many keys in one mutex acquisition; returns `{ key => Boolean }` |
 | `#allow!(key, weight: 1)` | Like `allow?` but raises `RateLimitExceeded` on rejection |
 | `#throttle(key, weight: 1) { }` | Execute block if allowed; returns `{ allowed:, value: }` |
 | `#peek(key)` | Check availability without consuming |
