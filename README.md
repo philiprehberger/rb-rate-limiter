@@ -107,6 +107,15 @@ info = limiter.info("user:123")
 
 The `reset_at` value is a monotonic timestamp suitable for computing X-RateLimit-Reset headers. It is `nil` when the key has no usage or is at full capacity.
 
+### Batch Info Lookups
+
+Mirrors `allow_batch` for inspection. The whole batch runs under a single mutex acquisition:
+
+```ruby
+limiter.info_batch(['user:1', 'user:2'])
+# => { 'user:1' => { remaining: 0, ... }, 'user:2' => { remaining: 100, ... } }
+```
+
 ### Inspect consumed count
 
 Call `used(key)` for a cheap integer count of currently consumed slots/tokens — it complements `remaining(key)` without allocating an `info` hash.
@@ -259,6 +268,7 @@ limiter.remaining("user:123")# => 0
 | `#clear` | Clear all state for every tracked key |
 | `#keys` | Return all currently tracked keys |
 | `#info(key)` | Return usage info hash (remaining, reset_at, limit/capacity, used/tokens) |
+| `#info_batch(keys)` | Return `{ key => info }` for many keys in one mutex acquisition |
 | `#stats(key)` | Return `{ allowed:, rejected: }` counters for a key |
 | `#wait_time(key)` | Seconds until next request is allowed (0 if now). `TokenBucket` also accepts `weight:` keyword argument |
 | `#retry_after(key)` | Seconds until the next allowed request (0.0 if allowed now); ready for the HTTP `Retry-After` header |

@@ -66,6 +66,18 @@ module Philiprehberger
         @mutex.synchronize { build_info(key) }
       end
 
+      # Build info hashes for many keys in a single mutex acquisition.
+      #
+      # Mirrors {#allow_batch} for inspection rather than acquisition.
+      #
+      # @param keys [Array<Symbol, String>] the keys to inspect
+      # @return [Hash{Object => Hash}] mapping of each key to its info hash
+      def info_batch(keys)
+        @mutex.synchronize do
+          keys.to_h { |key| [key, build_info(key)] }
+        end
+      end
+
       def refund(key, amount: 1)
         @mutex.synchronize { refund_tokens(key, amount.to_f) }
       end

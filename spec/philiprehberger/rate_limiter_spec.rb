@@ -190,6 +190,24 @@ RSpec.describe Philiprehberger::RateLimiter::SlidingWindow do
     end
   end
 
+  describe '#info_batch' do
+    it 'returns info for each key' do
+      2.times { limiter.allow?('user1') }
+      limiter.allow?('user2')
+
+      result = limiter.info_batch(%w[user1 user2 user3])
+
+      expect(result.keys).to eq(%w[user1 user2 user3])
+      expect(result['user1'][:used]).to eq(2)
+      expect(result['user2'][:used]).to eq(1)
+      expect(result['user3'][:used]).to eq(0)
+    end
+
+    it 'returns an empty hash for no keys' do
+      expect(limiter.info_batch([])).to eq({})
+    end
+  end
+
   describe '#stats' do
     it 'returns zeroes for an unused key' do
       stats = limiter.stats('user1')
@@ -505,6 +523,23 @@ RSpec.describe Philiprehberger::RateLimiter::TokenBucket do
     end
   end
 
+  describe '#info_batch' do
+    it 'returns info for each key' do
+      2.times { limiter.allow?('user1') }
+      limiter.allow?('user2')
+
+      result = limiter.info_batch(%w[user1 user2 user3])
+
+      expect(result.keys).to eq(%w[user1 user2 user3])
+      expect(result['user1'][:capacity]).to eq(3)
+      expect(result['user3'][:remaining]).to eq(3)
+    end
+
+    it 'returns an empty hash for no keys' do
+      expect(limiter.info_batch([])).to eq({})
+    end
+  end
+
   describe '#stats' do
     it 'returns zeroes for an unused key' do
       stats = limiter.stats('user1')
@@ -658,6 +693,15 @@ RSpec.describe Philiprehberger::RateLimiter::Noop do
 
     it 'defaults the key to :default' do
       expect(limiter.drain).to eq(Float::INFINITY)
+    end
+  end
+
+  describe '#info_batch' do
+    it 'returns Noop info for each key' do
+      result = limiter.info_batch(%w[user1 user2])
+      expect(result.keys).to eq(%w[user1 user2])
+      expect(result['user1'][:remaining]).to eq(Float::INFINITY)
+      expect(result['user2'][:used]).to eq(0)
     end
   end
 end

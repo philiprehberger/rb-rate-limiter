@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-05-13
+
+### Added
+- `#info_batch(keys)` on `SlidingWindow`, `TokenBucket`, and `Noop` — returns `{ key => info }` for many keys in a single mutex acquisition, mirroring `#allow_batch` for inspection.
+
 ## [0.11.0] - 2026-04-26
 
 ### Added

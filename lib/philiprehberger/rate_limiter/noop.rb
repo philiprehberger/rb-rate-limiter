@@ -50,6 +50,10 @@ module Philiprehberger
         { remaining: Float::INFINITY, limit: Float::INFINITY, used: 0 }
       end
 
+      def info_batch(keys)
+        keys.to_h { |key| [key, info(key)] }
+      end
+
       def stats(_key = :default)
         { allowed: 0, rejected: 0 }
       end
