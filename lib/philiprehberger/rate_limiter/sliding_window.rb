@@ -17,6 +17,11 @@ module Philiprehberger
         init_stats
       end
 
+      # Check if a request is allowed and consume slot(s) in the window.
+      #
+      # @param key [Symbol, String] the rate limit key
+      # @param weight [Integer] number of slots to consume (default 1)
+      # @return [Boolean] true if the request was allowed, false if rejected
       def allow?(key, weight: 1)
         @mutex.synchronize { try_acquire(key, weight) }
       end
@@ -31,10 +36,18 @@ module Philiprehberger
         end
       end
 
+      # Check if a request would be allowed without consuming a slot.
+      #
+      # @param key [Symbol, String] the rate limit key
+      # @return [Boolean] true if capacity is available, false otherwise
       def peek(key)
         @mutex.synchronize { count_remaining(key).positive? }
       end
 
+      # Return the number of remaining slots in the current window.
+      #
+      # @param key [Symbol, String] the rate limit key
+      # @return [Integer] count of remaining capacity (0 if at or over limit)
       def remaining(key)
         @mutex.synchronize { count_remaining(key) }
       end
@@ -50,6 +63,10 @@ module Philiprehberger
         end
       end
 
+      # Clear the window for a key, discarding all tracked entries.
+      #
+      # @param key [Symbol, String] the rate limit key
+      # @return [void]
       def reset(key)
         @mutex.synchronize { @store.delete(key.to_s) }
       end
@@ -65,6 +82,10 @@ module Philiprehberger
         nil
       end
 
+      # Build a usage info hash for a key.
+      #
+      # @param key [Symbol, String] the rate limit key
+      # @return [Hash] keys :remaining, :reset_at, :limit, :window, :used
       def info(key)
         @mutex.synchronize { build_info(key) }
       end
@@ -81,6 +102,11 @@ module Philiprehberger
         end
       end
 
+      # Return previously consumed slot(s) to a key (e.g. on downstream failure).
+      #
+      # @param key [Symbol, String] the rate limit key
+      # @param amount [Integer] number of slots to refund (default 1)
+      # @return [nil]
       def refund(key, amount: 1)
         @mutex.synchronize { refund_entries(key, amount) }
       end

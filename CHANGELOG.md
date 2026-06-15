@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-06-14
+
+### Changed
+- Added package card image to README
+- Added YARD doc comments to SlidingWindow public methods
+- Updated dev dependency pins to match standard Ruby package guide
+
+### Fixed
+- Clarified Noop limiter block-argument handling
+
 ## [0.12.0] - 2026-05-13
 
 ### Added

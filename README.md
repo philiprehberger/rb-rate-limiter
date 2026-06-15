@@ -4,6 +4,8 @@
 [![Gem Version](https://badge.fury.io/rb/philiprehberger-rate_limiter.svg)](https://rubygems.org/gems/philiprehberger-rate_limiter)
 [![Last updated](https://img.shields.io/github/last-commit/philiprehberger/rb-rate-limiter)](https://github.com/philiprehberger/rb-rate-limiter/commits/main)
 
+![philiprehberger-rate_limiter](https://raw.githubusercontent.com/philiprehberger/rb-rate-limiter/main/package-card.webp)
+
 In-memory rate limiter with sliding window and token bucket
 
 ## Requirements

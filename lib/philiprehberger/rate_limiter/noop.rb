@@ -67,7 +67,13 @@ module Philiprehberger
         { allowed: true, value: block.call }
       end
 
-      def on_reject(&)
+      # Register a callback for rejected requests.
+      #
+      # Noop ignores the callback since nothing is ever rejected.
+      #
+      # @return [self]
+      def on_reject(&block)
+        _ = block
         self
       end
     end
