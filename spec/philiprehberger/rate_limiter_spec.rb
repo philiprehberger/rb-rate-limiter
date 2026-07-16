@@ -942,3 +942,150 @@ RSpec.describe Philiprehberger::RateLimiter do
     end
   end
 end
+
+RSpec.describe 'Bounded keys' do
+  describe 'SlidingWindow#prune' do
+    subject(:limiter) { Philiprehberger::RateLimiter.sliding_window(limit: 3, window: 60) }
+
+    it 'drops keys whose window has fully expired (stubbed clock)' do
+      now = 1_000.0
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(now)
+      limiter.allow?(:old)
+      limiter.allow?(:fresh)
+
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(now + 61)
+      limiter.allow?(:fresh)
+
+      expect(limiter.prune).to eq(1)
+      expect(limiter.keys).to contain_exactly('fresh')
+    end
+
+    it 'clears stats for pruned keys' do
+      now = 2_000.0
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(now)
+      limiter.allow?(:old)
+
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(now + 61)
+      limiter.prune
+      expect(limiter.stats(:old)).to eq({ allowed: 0, rejected: 0 })
+    end
+
+    it 'keeps keys that still have live entries' do
+      limiter.allow?(:active)
+      expect(limiter.prune).to eq(0)
+      expect(limiter.keys).to contain_exactly('active')
+    end
+  end
+
+  describe 'SlidingWindow max_keys' do
+    it 'evicts the least-recently-touched key when the cap is exceeded' do
+      limiter = Philiprehberger::RateLimiter.sliding_window(limit: 5, window: 60, max_keys: 2)
+      limiter.allow?(:a)
+      limiter.allow?(:b)
+      limiter.allow?(:a) # touch a so b becomes least-recently-used
+      limiter.allow?(:c) # exceeds cap -> evict b
+
+      expect(limiter.keys).to contain_exactly('a', 'c')
+    end
+
+    it 'evicts stats alongside the store' do
+      limiter = Philiprehberger::RateLimiter.sliding_window(limit: 5, window: 60, max_keys: 1)
+      limiter.allow?(:a)
+      limiter.allow?(:b)
+      expect(limiter.keys).to contain_exactly('b')
+      expect(limiter.stats(:b)[:allowed]).to eq(1)
+    end
+  end
+
+  describe 'TokenBucket#prune' do
+    subject(:limiter) { Philiprehberger::RateLimiter.token_bucket(rate: 10, capacity: 3) }
+
+    it 'drops keys whose bucket has fully refilled (stubbed clock)' do
+      now = 3_000.0
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(now)
+      3.times { limiter.allow?(:drained) }
+      limiter.allow?(:partial)
+
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(now + 60)
+      expect(limiter.prune).to eq(2)
+      expect(limiter.keys).to eq([])
+    end
+
+    it 'keeps keys that are not yet fully refilled (stubbed clock)' do
+      now = 4_000.0
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(now)
+      3.times { limiter.allow?(:busy) }
+      expect(limiter.prune).to eq(0)
+      expect(limiter.keys).to contain_exactly('busy')
+    end
+  end
+
+  describe 'TokenBucket max_keys' do
+    it 'evicts the least-recently-touched key when the cap is exceeded' do
+      limiter = Philiprehberger::RateLimiter.token_bucket(rate: 1, capacity: 5, max_keys: 2)
+      limiter.allow?(:a)
+      limiter.allow?(:b)
+      limiter.allow?(:a) # touch a
+      limiter.allow?(:c) # evict b
+
+      expect(limiter.keys).to contain_exactly('a', 'c')
+    end
+  end
+end
+
+RSpec.describe 'Blocking acquire' do
+  describe '#block returns true immediately when capacity is available' do
+    it 'acquires without sleeping (sliding window)' do
+      limiter = Philiprehberger::RateLimiter.sliding_window(limit: 3, window: 60)
+      expect(limiter).not_to receive(:sleep)
+      expect(limiter.block(:user, timeout: 5)).to be true
+    end
+
+    it 'consumes the requested weight' do
+      limiter = Philiprehberger::RateLimiter.sliding_window(limit: 3, window: 60)
+      limiter.block(:user, weight: 2)
+      expect(limiter.remaining(:user)).to eq(1)
+    end
+  end
+
+  describe '#block with a stubbed clock' do
+    it 'returns false when the timeout elapses before capacity frees (token bucket)' do
+      limiter = Philiprehberger::RateLimiter.token_bucket(rate: 0.0001, capacity: 1)
+      clock = 10_000.0
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC) { clock }
+      limiter.allow?(:user) # empty the bucket
+      allow(limiter).to receive(:sleep) { |secs| clock += secs }
+
+      expect(limiter.block(:user, timeout: 0.5)).to be false
+    end
+
+    it 'sleeps then acquires once tokens refill (token bucket)' do
+      limiter = Philiprehberger::RateLimiter.token_bucket(rate: 100, capacity: 1)
+      clock = 100.0
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC) { clock }
+      limiter.allow?(:user) # empty the bucket at t=100
+      # Real sleep never returns early; model a small overshoot so the refill
+      # clears the 1-token boundary deterministically (no float cancellation).
+      allow(limiter).to receive(:sleep) { |secs| clock += secs + 0.001 }
+
+      expect(limiter.block(:user, timeout: 5)).to be true
+    end
+  end
+
+  describe '#block smoke test with real sleep' do
+    it 'blocks briefly then succeeds' do
+      limiter = Philiprehberger::RateLimiter.token_bucket(rate: 50, capacity: 1)
+      limiter.allow?(:user) # empty the bucket
+      start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      expect(limiter.block(:user, timeout: 2)).to be true
+      elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
+      expect(elapsed).to be < 2
+    end
+
+    it 'returns false when the real timeout elapses' do
+      limiter = Philiprehberger::RateLimiter.token_bucket(rate: 0.1, capacity: 1)
+      limiter.allow?(:user) # empty the bucket
+      expect(limiter.block(:user, timeout: 0.1)).to be false
+    end
+  end
+end

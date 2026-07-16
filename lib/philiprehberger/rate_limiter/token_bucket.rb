@@ -9,9 +9,14 @@ module Philiprehberger
 
       attr_reader :rate, :capacity
 
-      def initialize(rate:, capacity:)
+      # @param rate [Numeric] tokens refilled per second
+      # @param capacity [Numeric] max tokens the bucket can hold
+      # @param max_keys [Integer, nil] cap on tracked keys; least-recently-touched
+      #   key is evicted (LRU) once the cap is exceeded. nil means unbounded.
+      def initialize(rate:, capacity:, max_keys: nil)
         @rate = rate.to_f
         @capacity = capacity.to_f
+        @max_keys = max_keys
         @store = {}
         @mutex = Mutex.new
         init_stats
@@ -80,6 +85,26 @@ module Philiprehberger
 
       def refund(key, amount: 1)
         @mutex.synchronize { refund_tokens(key, amount.to_f) }
+      end
+
+      # Drop keys whose bucket has fully refilled back to capacity, reclaiming
+      # memory for idle keys. Also clears their stats.
+      #
+      # @return [Integer] the number of keys pruned
+      def prune
+        @mutex.synchronize do
+          pruned = 0
+          tracked = @store.keys
+          tracked.each do |key|
+            refill(key)
+            next unless @store[key][:tokens] >= @capacity
+
+            @store.delete(key)
+            @stats_store.delete(key)
+            pruned += 1
+          end
+          pruned
+        end
       end
 
       # Forcefully consume all remaining tokens for a key.
@@ -182,7 +207,26 @@ module Philiprehberger
       end
 
       def fetch_bucket(key)
-        @store[key.to_s] ||= { tokens: @capacity, last_refill: now }
+        k = key.to_s
+        bucket = @store[k]
+        if bucket
+          @store.delete(k)
+          @store[k] = bucket
+        else
+          bucket = @store[k] = { tokens: @capacity, last_refill: now }
+          evict_lru
+        end
+        bucket
+      end
+
+      def evict_lru
+        return unless @max_keys
+
+        while @store.size > @max_keys
+          oldest = @store.keys.first
+          @store.delete(oldest)
+          @stats_store.delete(oldest)
+        end
       end
 
       def now

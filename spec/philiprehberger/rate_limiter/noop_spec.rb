@@ -58,4 +58,45 @@ RSpec.describe Philiprehberger::RateLimiter::Noop do
   it 'defaults the retry_after key to :default' do
     expect(limiter.retry_after).to eq(0.0)
   end
+
+  describe 'API parity with real limiters' do
+    it 'exposes refund returning nil' do
+      expect(limiter.refund('k', amount: 3)).to be_nil
+    end
+
+    it 'defaults refund key and amount' do
+      expect(limiter.refund).to be_nil
+    end
+
+    it 'reports 0.0 wait_time' do
+      expect(limiter.wait_time('k')).to eq(0.0)
+      expect(limiter.wait_time('k', weight: 5)).to eq(0.0)
+    end
+
+    it 'defaults the wait_time key to :default' do
+      expect(limiter.wait_time).to eq(0.0)
+    end
+
+    it 'reports nil window_reset_at' do
+      expect(limiter.window_reset_at('k')).to be_nil
+    end
+
+    it 'defaults the window_reset_at key to :default' do
+      expect(limiter.window_reset_at).to be_nil
+    end
+
+    it 'always acquires immediately from block' do
+      expect(limiter.block('k', timeout: 0.01)).to be true
+    end
+
+    it 'defaults block arguments' do
+      expect(limiter.block).to be true
+    end
+
+    it 'no longer raises NoMethodError for the previously missing methods' do
+      %i[refund wait_time window_reset_at block].each do |method|
+        expect { limiter.public_send(method, 'k') }.not_to raise_error
+      end
+    end
+  end
 end

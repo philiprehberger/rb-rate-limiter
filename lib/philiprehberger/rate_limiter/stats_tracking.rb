@@ -45,7 +45,40 @@ module Philiprehberger
         @mutex.synchronize { @store.keys }
       end
 
+      # Block until capacity is available, then consume it.
+      #
+      # Loops on {#retry_after}, sleeping between checks until {#allow?}
+      # succeeds. When +timeout+ is given, returns false if the budget elapses
+      # before capacity frees up.
+      #
+      # @param key [Symbol, String] the rate limit key
+      # @param timeout [Float, nil] max seconds to wait (nil = wait forever)
+      # @param weight [Integer] tokens/slots to consume
+      # @return [Boolean] true once acquired, false if the timeout elapsed
+      def block(key = :default, timeout: nil, weight: 1)
+        deadline = timeout ? monotonic_time + timeout : nil
+        loop do
+          return true if allow?(key, weight: weight)
+
+          wait = retry_after(key)
+          wait = 0.01 if wait <= 0.0
+
+          if deadline
+            budget = deadline - monotonic_time
+            return false if budget <= 0.0
+
+            wait = budget if wait > budget
+          end
+
+          sleep(wait)
+        end
+      end
+
       private
+
+      def monotonic_time
+        Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      end
 
       def fetch_stats(key)
         @stats_store[key.to_s] ||= { allowed: 0, rejected: 0 }

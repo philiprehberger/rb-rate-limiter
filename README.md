@@ -60,6 +60,20 @@ else
 end
 ```
 
+### Fixed Window
+
+Counts requests in discrete, non-overlapping windows. Uses O(1) memory per key — a single counter plus the window-start timestamp — and resets the counter when the window elapses.
+
+```ruby
+limiter = Philiprehberger::RateLimiter.fixed_window(limit: 100, window: 60)
+
+if limiter.allow?("user:123")
+  # Request is allowed
+else
+  # Rate limit exceeded
+end
+```
+
 ### No-op Limiter
 
 A limiter that always allows requests — useful in test environments or when a feature is behind a kill-switch.
@@ -243,21 +257,51 @@ limiter.allow?("user:123")   # => false
 limiter.remaining("user:123")# => 0
 ```
 
-### Sliding Window vs Token Bucket
+### Blocking Acquire
 
-| Feature | SlidingWindow | TokenBucket |
-|---------|---------------|-------------|
-| Best for | Fixed request counts per window | Allowing bursts with steady refill |
-| Parameters | `limit`, `window` (seconds) | `rate` (tokens/sec), `capacity` |
-| Burst behavior | No bursting beyond limit | Allows bursts up to capacity |
-| Memory | Stores timestamps per request | Stores one float + timestamp per key |
+Wait until capacity is available instead of failing fast. `block` loops on `retry_after`, sleeping between checks, and returns `true` once a slot is acquired — or `false` if the optional `timeout` (in seconds) elapses first:
+
+```ruby
+if limiter.block("user:123", timeout: 5)
+  make_api_call        # acquired within 5 seconds
+else
+  handle_timeout       # gave up after 5 seconds
+end
+
+limiter.block("user:123")             # wait forever (no timeout)
+limiter.block("user:123", weight: 3)  # wait for 3 slots/tokens
+```
+
+### Bounded Keys
+
+Long-lived limiters that see many distinct keys can grow unbounded. Two tools keep memory in check on `SlidingWindow` and `TokenBucket`:
+
+```ruby
+# LRU eviction: cap the number of tracked keys. The least-recently-touched
+# key (and its stats) is evicted once the cap is exceeded.
+limiter = Philiprehberger::RateLimiter.sliding_window(limit: 100, window: 60, max_keys: 10_000)
+
+# Prune: drop idle keys — empty windows (SlidingWindow) or fully-refilled
+# buckets (TokenBucket) — reclaiming their memory and stats. Returns the count pruned.
+limiter.prune # => 42
+```
+
+### Sliding Window vs Token Bucket vs Fixed Window
+
+| Feature | SlidingWindow | TokenBucket | FixedWindow |
+|---------|---------------|-------------|-------------|
+| Best for | Fixed request counts per rolling window | Allowing bursts with steady refill | Cheap counts per discrete window |
+| Parameters | `limit`, `window` (seconds) | `rate` (tokens/sec), `capacity` | `limit`, `window` (seconds) |
+| Burst behavior | No bursting beyond limit | Allows bursts up to capacity | Allows bursts at window boundaries |
+| Memory | Stores timestamps per request | Stores one float + timestamp per key | Stores one counter + timestamp per key |
 
 ## API
 
 | Method | Description |
 |--------|-------------|
-| `RateLimiter.sliding_window(limit:, window:)` | Create a sliding window limiter |
-| `RateLimiter.token_bucket(rate:, capacity:)` | Create a token bucket limiter |
+| `RateLimiter.sliding_window(limit:, window:, max_keys: nil)` | Create a sliding window limiter |
+| `RateLimiter.token_bucket(rate:, capacity:, max_keys: nil)` | Create a token bucket limiter |
+| `RateLimiter.fixed_window(limit:, window:)` | Create a fixed window limiter (O(1) memory per key) |
 | `RateLimiter.noop` | Create a limiter that always allows requests |
 | `#allow?(key, weight: 1)` | Check and consume token(s); returns `true`/`false` |
 | `#allow_batch(keys)` | Check many keys in one mutex acquisition; returns `{ key => Boolean }` |
@@ -276,6 +320,8 @@ limiter.remaining("user:123")# => 0
 | `#retry_after(key)` | Seconds until the next allowed request (0.0 if allowed now); ready for the HTTP `Retry-After` header |
 | `SlidingWindow#window_reset_at(key)` | Time when current window expires |
 | `#refund(key, amount: 1)` | Return tokens/slots on error |
+| `#block(key, timeout: nil, weight: 1)` | Wait for capacity; returns `true` when acquired, `false` on timeout |
+| `#prune` | Drop idle keys (empty windows / fully-refilled buckets) and their stats; returns count pruned (`SlidingWindow`, `TokenBucket`) |
 | `#drain(key)` | Forcefully consume all remaining capacity; returns amount drained |
 | `#on_reject { \|key\| }` | Register a callback for rejected requests |
 | `SlidingWindow#limit` | Return the configured request limit |

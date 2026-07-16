@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-07-15
+
+### Added
+- Key pruning and bounded key tracking on `SlidingWindow` and `TokenBucket`: `#prune` drops empty/fully-refilled keys (clearing their stats), and a `max_keys:` constructor option evicts the least-recently-touched key (LRU) once the cap is exceeded — covering both the quota store and the stats store.
+- `RateLimiter.fixed_window(limit:, window:)` — a fixed-window `FixedWindow` limiter with O(1) memory per key (a counter plus a window-start timestamp that resets when the window elapses), reusing the `StatsTracking` mixin and the shared limiter surface.
+- Blocking acquire: `#block(key, timeout:, weight:)` on `SlidingWindow`, `TokenBucket`, `FixedWindow`, and `Noop` — waits until capacity is available (sleeping on `retry_after`), returning `true` once acquired or `false` if the `timeout` elapses first.
+
+### Fixed
+- `Noop` API parity: added `#refund`, `#wait_time`, and `#window_reset_at` (and `#block`) so a `Noop` limiter is a true drop-in replacement and no longer raises `NoMethodError` when swapped for a real limiter.
+
 ## [0.12.1] - 2026-06-14
 
 ### Changed
@@ -165,3 +175,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `remaining` to query available quota
 - `reset` to clear state for a key
 - Convenience factory methods on the module
+
+[Unreleased]: https://github.com/philiprehberger/rb-rate-limiter/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/philiprehberger/rb-rate-limiter/compare/v0.12.1...v0.13.0

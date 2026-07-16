@@ -4,19 +4,19 @@ require_relative 'stats_tracking'
 
 module Philiprehberger
   module RateLimiter
-    class SlidingWindow
+    # Fixed-window rate limiter. Each key stores a single counter plus the
+    # timestamp when its current window opened — O(1) memory per key. The
+    # counter resets to zero once the window duration elapses.
+    class FixedWindow
       include StatsTracking
 
       attr_reader :limit, :window
 
       # @param limit [Integer] max requests allowed per window
       # @param window [Numeric] window duration in seconds
-      # @param max_keys [Integer, nil] cap on tracked keys; least-recently-touched
-      #   key is evicted (LRU) once the cap is exceeded. nil means unbounded.
-      def initialize(limit:, window:, max_keys: nil)
+      def initialize(limit:, window:)
         @limit = limit
         @window = window
-        @max_keys = max_keys
         @store = {}
         @mutex = Mutex.new
         init_stats
@@ -57,18 +57,15 @@ module Philiprehberger
         @mutex.synchronize { count_remaining(key) }
       end
 
-      # Number of currently consumed slots for a key (after expiring old entries).
+      # Number of currently consumed slots for a key in the active window.
       #
       # @param key [Symbol, String] the rate limit key
-      # @return [Integer] count of active entries in the window
+      # @return [Integer] count consumed in the current window
       def used(key)
-        @mutex.synchronize do
-          cleanup(key)
-          fetch_entries(key).length
-        end
+        @mutex.synchronize { roll(key)[:count] }
       end
 
-      # Clear the window for a key, discarding all tracked entries.
+      # Clear the window for a key.
       #
       # @param key [Symbol, String] the rate limit key
       # @return [void]
@@ -97,8 +94,6 @@ module Philiprehberger
 
       # Build info hashes for many keys in a single mutex acquisition.
       #
-      # Mirrors {#allow_batch} for inspection rather than acquisition.
-      #
       # @param keys [Array<Symbol, String>] the keys to inspect
       # @return [Hash{Object => Hash}] mapping of each key to its info hash
       def info_batch(keys)
@@ -113,51 +108,24 @@ module Philiprehberger
       # @param amount [Integer] number of slots to refund (default 1)
       # @return [nil]
       def refund(key, amount: 1)
-        @mutex.synchronize { refund_entries(key, amount) }
-      end
-
-      # Drop keys whose window is empty (all entries have expired), reclaiming
-      # memory for idle keys. Also clears their stats.
-      #
-      # @return [Integer] the number of keys pruned
-      def prune
         @mutex.synchronize do
-          pruned = 0
-          tracked = @store.keys
-          tracked.each do |key|
-            cleanup(key)
-            next unless @store[key].empty?
-
-            @store.delete(key)
-            @stats_store.delete(key)
-            pruned += 1
-          end
-          pruned
+          bucket = roll(key)
+          bucket[:count] = [bucket[:count] - amount, 0].max
+          nil
         end
       end
 
-      # Forcefully consume all remaining capacity for a key.
+      # Seconds until the next request would be allowed.
       #
       # @param key [Symbol, String] the rate limit key
-      # @return [Integer] the number of slots drained
-      def drain(key = :default)
-        @mutex.synchronize { drain_entries(key) }
-      end
-
-      # Seconds until the next request would be allowed
-      #
-      # @param key [Symbol, String] the rate limit key
+      # @param weight [Integer] slots needed
       # @return [Float] seconds to wait (0 if allowed now)
-      def wait_time(key = :default)
+      def wait_time(key = :default, weight: 1)
         @mutex.synchronize do
-          cleanup(key)
-          entries = fetch_entries(key)
-          return 0.0 if entries.length < @limit
+          bucket = roll(key)
+          return 0.0 if bucket[:count] + weight <= @limit
 
-          oldest = entries.min
-          return 0.0 if oldest.nil?
-
-          wait = oldest + @window - now
+          wait = (bucket[:window_start] + @window) - now
           [wait, 0.0].max
         end
       end
@@ -169,113 +137,57 @@ module Philiprehberger
       # @return [Float] seconds until next allowed request (0.0 if allowed now)
       def retry_after(key = :default)
         @mutex.synchronize do
-          cleanup(key)
-          entries = fetch_entries(key)
-          return 0.0 if entries.length < @limit
+          bucket = roll(key)
+          return 0.0 if bucket[:count] < @limit
 
-          oldest = entries.min
-          return 0.0 if oldest.nil?
-
-          wait = (oldest + @window) - now
+          wait = (bucket[:window_start] + @window) - now
           [wait, 0.0].max
-        end
-      end
-
-      # Time when the current window expires
-      #
-      # @param key [Symbol, String] the rate limit key
-      # @return [Time, nil] absolute time when window resets, nil if no requests
-      def window_reset_at(key = :default)
-        @mutex.synchronize do
-          entries = fetch_entries(key)
-          return nil if entries.empty?
-
-          cleanup(key)
-          entries = fetch_entries(key)
-          return nil if entries.empty?
-
-          oldest = entries.min
-          elapsed = now - oldest
-          Time.now + (@window - elapsed)
         end
       end
 
       private
 
       def try_acquire(key, weight)
-        cleanup(key)
-        entries = fetch_entries(key)
-        return reject_request(key) if entries.length + weight > @limit
+        bucket = roll(key)
+        if bucket[:count] + weight > @limit
+          record_rejected(key)
+          return false
+        end
 
-        weight.times { entries << now }
+        bucket[:count] += weight
         record_allowed(key)
         true
       end
 
-      def reject_request(key)
-        record_rejected(key)
-        false
-      end
-
       def build_info(key)
-        cleanup(key)
-        entries = fetch_entries(key)
-        oldest = entries.min
+        bucket = roll(key)
+        used = bucket[:count]
         {
-          remaining: [@limit - entries.length, 0].max,
-          reset_at: oldest ? oldest + @window : nil,
+          remaining: [@limit - used, 0].max,
+          reset_at: used.positive? ? bucket[:window_start] + @window : nil,
           limit: @limit,
           window: @window,
-          used: entries.length
+          used: used
         }
       end
 
-      def refund_entries(key, amount)
-        entries = fetch_entries(key)
-        [amount, entries.length].min.times { entries.pop }
-        nil
-      end
-
-      def drain_entries(key)
-        cleanup(key)
-        entries = fetch_entries(key)
-        remaining = [@limit - entries.length, 0].max
-        remaining.times { entries << now }
-        remaining
-      end
-
       def count_remaining(key)
-        cleanup(key)
-        [@limit - fetch_entries(key).length, 0].max
+        [@limit - roll(key)[:count], 0].max
       end
 
-      def cleanup(key)
-        entries = fetch_entries(key)
-        cutoff = now - @window
-        entries.reject! { |ts| ts <= cutoff }
-      end
-
-      def fetch_entries(key)
-        k = key.to_s
-        entries = @store[k]
-        if entries
-          @store.delete(k)
-          @store[k] = entries
-        else
-          entries = @store[k] = []
-          evict_lru
+      # Fetch the bucket for a key, rolling it into a fresh window when the
+      # current window has elapsed.
+      def roll(key)
+        bucket = fetch_bucket(key)
+        if now - bucket[:window_start] >= @window
+          bucket[:count] = 0
+          bucket[:window_start] = now
         end
-        entries
+        bucket
       end
 
-      def evict_lru
-        return unless @max_keys
-
-        while @store.size > @max_keys
-          oldest = @store.keys.first
-          @store.delete(oldest)
-          @stats_store.delete(oldest)
-        end
+      def fetch_bucket(key)
+        @store[key.to_s] ||= { count: 0, window_start: now }
       end
 
       def now

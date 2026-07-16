@@ -42,6 +42,39 @@ module Philiprehberger
         0.0
       end
 
+      # Return previously consumed slot(s). No-op always has capacity, so this
+      # does nothing and mirrors the real limiters' signature.
+      #
+      # @return [nil]
+      def refund(_key = :default, amount: 1)
+        _ = amount
+        nil
+      end
+
+      # Seconds until the next request would be allowed. Always allowed.
+      #
+      # @return [Float] always 0.0
+      def wait_time(_key = :default, weight: 1)
+        _ = weight
+        0.0
+      end
+
+      # Time when the current window expires. Noop has no window.
+      #
+      # @return [nil]
+      def window_reset_at(_key = :default)
+        nil
+      end
+
+      # Blocking acquire. Noop always has capacity, so it returns immediately.
+      #
+      # @return [true]
+      def block(_key = :default, timeout: nil, weight: 1)
+        _ = timeout
+        _ = weight
+        true
+      end
+
       def clear
         nil
       end
